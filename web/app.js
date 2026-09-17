@@ -10,7 +10,12 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fmtSigned = (n) =>
   `${n >= 0 ? "+" : "−"}$${Math.abs(Math.round(n)).toLocaleString("en-US")}/yr`;
 const fmtWage = (n) => `$${Math.round(n).toLocaleString("en-US")}/yr`;
-const pct = (x) => `${Math.round(x * 100)}`;
+const ordinal = (n) => {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] || "th"}`;
+};
+const pctile = (x) => ordinal(Math.round(x * 100));
 
 let current = { originSoc: null, originTitle: "", transitions: [] };
 
@@ -311,7 +316,7 @@ function renderExposure(exposure) {
     )
     .join("");
   const pcts = entries
-    .map(([, v]) => `<span>${v == null ? "n/a" : pct(v) + "th"}</span>`)
+    .map(([, v]) => `<span>${v == null ? "n/a" : pctile(v)}</span>`)
     .join("");
   const names = entries.map(([n]) => `<span>${n}</span>`).join("");
   $("exposure-panel").innerHTML = `
