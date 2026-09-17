@@ -60,7 +60,8 @@
 Orchestration: flows/pipeline.py — plain fail-fast runner (ingest → normalize → dbt build+test → precompute → quality report)
 Packaging:     Docker (ONE image: FastAPI serves API + web/) ; Makefile targets
 CI:            GitHub Actions (lint, pytest, dbt test on sample data)
-Deploy:        Hugging Face Spaces (Docker mode) or Render/Fly.io — one container
+Deploy:        GitHub Pages (free, static edition: skillbridge.export_static, built by Actions)
+               Docker remains for local/any-host runs of the full FastAPI product
 ```
 
 ## 2. Why these choices
@@ -129,6 +130,7 @@ Design contract: **`docs/05_DESIGN.md`** (dark canvas, single green accent, typo
 - **View — Metro map (deferred to v1.1):** needs the OEWS metro files (direct bls.gov download); the local edition ships national wages only, per the scope-cut rule in 01_PLAN.md.
 - **Share card:** button calls `GET /card/{from}/{to}`; the PNG is rendered **server-side** (Pillow/plotly export) so the download is pixel-identical everywhere.
 - **States:** every view has designed loading, empty, and error states (see `05_DESIGN.md`); API errors surface as friendly copy ("We couldn't match that job title — try a broader one"), never raw JSON.
+- **Static edition (the free live demo):** `python -m skillbridge.export_static` writes `site/` — the same frontend plus every precomputed answer as JSON (occupations, per-origin transitions/best-move/paths, the skill matrix). A GitHub Actions workflow runs the pipeline and publishes it to GitHub Pages on every push, so hosting costs nothing and never sleeps. Documented deviation from the browser-does-no-math rule: with no server available, the BOM tier split and the share-card PNG are rendered client-side from the precomputed skill levels; every underlying number is still pipeline-computed. The FastAPI product remains authoritative.
 
 ## 6. Testing strategy (what reviewers will check)
 

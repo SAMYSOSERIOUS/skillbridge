@@ -19,7 +19,149 @@ const pctile = (x) => ordinal(Math.round(x * 100));
 
 let current = { originSoc: null, originTitle: "", transitions: [] };
 
+/* Static edition (GitHub Pages): the same "API" answered from precomputed
+   JSON exported by skillbridge.export_static. Everything shown was computed
+   server-side by the pipeline; the only client-side computation is the BOM
+   tier split from precomputed skill levels (documented deviation,
+   docs/03_ARCHITECTURE.md §5). */
+const STATIC = !!window.SB_STATIC;
+const staticCache = {};
+
+async function staticFetch(name) {
+  if (!(name in staticCache)) {
+    const res = await fetch(`./data/${name}.json`);
+    if (!res.ok) throw new Error("MISSING");
+    staticCache[name] = await res.json();
+  }
+  return staticCache[name];
+}
+
+const NOT_FOUND = "We couldn't match that occupation. Try a broader job title.";
+
+async function staticApi(path) {
+  const [p, queryStr] = path.split("?");
+  const seg = p.split("/").filter(Boolean); // ["api", endpoint, ...args]
+  const endpoint = seg[1];
+
+  if (endpoint === "occupations") {
+    const occs = await staticFetch("occupations");
+    const q = new URLSearchParams(queryStr || "").get("q") || "";
+    const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const scored = [];
+    for (const o of Object.values(occs)) {
+      const hay = `${o.title} ${o.display_title}`.toLowerCase();
+      const hits = tokens.filter((t) => hay.includes(t)).length;
+      if (tokens.length && hits === 0) continue;
+      scored.push([hits * 1e12 + (o.employment || 0), o]);
+    }
+    scored.sort((a, b) => b[0] - a[0]);
+    return {
+      query: q,
+      results: scored.slice(0, 8).map(([, o]) => ({
+        soc_code: o.soc_code,
+        title: o.title,
+        display_title: o.display_title,
+        servable: o.servable,
+      })),
+    };
+  }
+
+  if (endpoint === "transitions" || endpoint === "paths") {
+    const soc = seg[2];
+    const occs = await staticFetch("occupations");
+    const occ = occs[soc];
+    if (!occ) throw new Error(NOT_FOUND);
+    if (!occ.servable) {
+      throw new Error(`'${occ.title}' can't be analyzed: ${occ.excluded_reason}.`);
+    }
+    let bundle;
+    try {
+      bundle = await staticFetch(`origins/${soc}`);
+    } catch {
+      throw new Error(NOT_FOUND);
+    }
+    if (endpoint === "paths") {
+      return { origin_soc: soc, paths: bundle.paths, synthetic: false };
+    }
+    return bundle;
+  }
+
+  if (endpoint === "exposure") {
+    const occs = await staticFetch("occupations");
+    const occ = occs[seg[2]];
+    if (!occ) throw new Error(NOT_FOUND);
+    if (!occ.exposure) throw new Error(`No AI-exposure data for '${occ.title}'.`);
+    return {
+      soc_code: occ.soc_code,
+      display_title: occ.display_title,
+      exposure: occ.exposure,
+      synthetic: false,
+    };
+  }
+
+  if (endpoint === "bom") {
+    const [fromSoc, toSoc] = [seg[2], seg[3]];
+    const [occs, skills, config] = await Promise.all([
+      staticFetch("occupations"),
+      staticFetch("skills"),
+      staticFetch("config"),
+    ]);
+    const origin = occs[fromSoc];
+    const target = occs[toSoc];
+    if (!origin || !target) throw new Error(NOT_FOUND);
+    const ov = skills[fromSoc];
+    const tv = skills[toSoc];
+    if (!ov || !tv) {
+      throw new Error(
+        "One of these occupations has no O*NET skill profile (residual category)."
+      );
+    }
+    const cfg = config.bom;
+    const tiers = { transferable: [], upgrade: [], acquire: [] };
+    for (const skill of Object.keys(tv).sort()) {
+      const tIm = tv[skill][0];
+      if (tIm < cfg.relevant_importance_min) continue;
+      const oLv = (ov[skill] || [0, 0])[1];
+      const tLv = tv[skill][1];
+      const gap = Math.max(0, tLv - oLv);
+      const entry = {
+        skill,
+        origin_level: Math.round(oLv * 1000) / 10,
+        target_level: Math.round(tLv * 1000) / 10,
+        gap: Math.round(gap * 1000) / 10,
+        weighted_gap: gap * tIm,
+      };
+      if (oLv >= tLv - cfg.transferable_tolerance) tiers.transferable.push(entry);
+      else if (oLv >= cfg.upgrade_floor_ratio * tLv) tiers.upgrade.push(entry);
+      else tiers.acquire.push(entry);
+    }
+    for (const t of Object.values(tiers)) t.sort((a, b) => b.weighted_gap - a.weighted_gap);
+    return {
+      from_title: origin.display_title,
+      to_title: target.display_title,
+      wage_delta:
+        origin.wage_median != null && target.wage_median != null
+          ? target.wage_median - origin.wage_median
+          : null,
+      exposure_delta:
+        origin.exposure && target.exposure
+          ? Math.round((target.exposure.composite - origin.exposure.composite) * 1000) / 1000
+          : null,
+      ...tiers,
+      synthetic: false,
+    };
+  }
+
+  if (endpoint === "meta") {
+    const config = await staticFetch("config");
+    return { mode: "real", synthetic: false, ...config.meta };
+  }
+
+  throw new Error("Something went wrong. Try again.");
+}
+
 async function api(path) {
+  if (STATIC) return staticApi(path);
   let res;
   try {
     res = await fetch(path);
@@ -388,13 +530,110 @@ async function openBom(fromSoc, toSoc) {
       ${tierBlock("✅ You already have", "transferable", b.transferable, "Nothing at target level yet.")}
       ${tierBlock("🟡 Needs upgrading", "upgrade", b.upgrade, "Nothing to upgrade.")}
       ${tierBlock("🔴 Must learn", "acquire", b.acquire, "Nothing brand new to learn.")}
-      <a class="share" href="/api/card/${fromSoc}/${toSoc}" download>Download my escape plan card</a>
+      ${
+        STATIC
+          ? '<button class="share" id="share-card">Download my escape plan card</button>'
+          : `<a class="share" href="/api/card/${fromSoc}/${toSoc}" download>Download my escape plan card</a>`
+      }
       <p class="hint">Levels are O*NET scores (0-100). Estimates from public data - not career advice.</p>
     `;
+    if (STATIC) {
+      $("share-card").addEventListener("click", () => downloadCard(b, fromSoc, toSoc));
+    }
     countUp($("bom-wage"), b.wage_delta);
   } catch (e) {
     $("drawer-content").innerHTML = `<h2>Skill gap</h2><p class="pair">${e.message}</p>`;
   }
+}
+
+function downloadCard(b, fromSoc, toSoc) {
+  /* Canvas render of the escape-plan card (static edition; mirrors
+     python/skillbridge/cards/render.py and the styles.css tokens). */
+  const c = document.createElement("canvas");
+  c.width = 1200;
+  c.height = 630;
+  const ctx = c.getContext("2d");
+  const font = (px, w = 400) => `${w} ${px}px Inter, system-ui, sans-serif`;
+
+  ctx.fillStyle = T("--bg");
+  ctx.fillRect(0, 0, 1200, 630);
+
+  ctx.fillStyle = T("--text-2");
+  ctx.font = font(22, 500);
+  ctx.fillText("SKILLBRIDGE", 60, 70);
+
+  ctx.font = font(26);
+  ctx.fillText("My career escape plan", 60, 160);
+
+  const headline = `${b.from_title}  →  ${b.to_title}`;
+  let size = 44;
+  ctx.font = font(size, 500);
+  while (size > 22 && ctx.measureText(headline).width > 560) {
+    size -= 2;
+    ctx.font = font(size, 500);
+  }
+  ctx.fillStyle = T("--text");
+  ctx.fillText(headline, 60, 215);
+
+  ctx.fillStyle = T("--accent");
+  ctx.font = font(64, 500);
+  ctx.fillText(b.wage_delta == null ? "wage: n/a" : fmtSigned(b.wage_delta), 60, 330);
+
+  if (b.exposure_delta != null) {
+    ctx.fillStyle = T("--text-2");
+    ctx.font = font(26);
+    const arrow = b.exposure_delta < 0 ? "lower" : "higher";
+    const pts = Math.round(b.exposure_delta * 100);
+    ctx.fillText(`AI exposure: ${arrow} (${pts >= 0 ? "+" : ""}${pts} percentile points)`, 60, 385);
+  }
+
+  ctx.fillStyle = T("--surface");
+  ctx.strokeStyle = T("--border");
+  ctx.beginPath();
+  ctx.roundRect(640, 130, 500, 300, 16);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = T("--text-2");
+  ctx.font = font(24);
+  ctx.fillText("Skills to learn first", 672, 190);
+  const toLearn = [...b.acquire, ...b.upgrade].slice(0, 3);
+  ctx.font = font(28);
+  let y = 250;
+  if (!toLearn.length) {
+    ctx.fillStyle = T("--text");
+    ctx.fillText("You already have the skills.", 672, y);
+  }
+  for (const item of toLearn) {
+    ctx.fillStyle = T("--accent");
+    ctx.beginPath();
+    ctx.arc(680, y - 8, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = T("--text");
+    ctx.fillText(item.skill, 704, y);
+    y += 62;
+  }
+
+  ctx.strokeStyle = T("--border");
+  ctx.beginPath();
+  ctx.moveTo(60, 520);
+  ctx.lineTo(1140, 520);
+  ctx.stroke();
+  ctx.fillStyle = T("--text-3");
+  ctx.font = font(20);
+  ctx.fillText(
+    "Data: O*NET (USDOL/ETA, CC BY 4.0) · BLS OEWS · AIOE · OpenAI · Microsoft Research",
+    60,
+    565
+  );
+  ctx.fillText("Estimates from public data - not career advice. Built with SkillBridge.", 60, 598);
+
+  c.toBlob((blob) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `skillbridge_${fromSoc}_${toSoc}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, "image/png");
 }
 
 function countUp(el, target) {

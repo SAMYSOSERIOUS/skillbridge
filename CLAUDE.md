@@ -16,12 +16,13 @@ The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as stati
 - `make test` — ruff + pytest + dbt test (must be green before any milestone is called done)
 - `make app` — uvicorn: one FastAPI process serving the API **and** the `web/` frontend
 - `make demo` — app on the bundled synthetic 5-occupation fixture in `data/sample/` (no network). CI uses this.
+- `make site` — export the static GitHub Pages edition to `site/` (after `make build`).
 
 ## Hard rules
 1. **Never invent data.** All values come from the real files listed in `docs/04_DATASETS.md`. If a download fails or a schema differs from the doc, stop, report, and update the doc in the same commit as the code fix. No synthetic placeholder values outside `data/sample/` fixtures (which are clearly labeled).
 2. **No silent drops.** Filtered rows (suppressed O*NET values, suppressed OEWS cells, unmatched crosswalk codes) are counted into the auto-generated `data_quality.md`. Suppressed wages are NULL, never 0.
 3. **All joins go through `dim_soc_crosswalk`** with dbt tests asserting ≥95% coverage. Never join O*NET-SOC to OEWS codes directly.
-4. **The browser talks only to the API.** Every number in the UI comes from a `fetch()` of a FastAPI endpoint backed by marts/artifacts — no in-browser math beyond formatting, no data files loaded directly by the frontend. API contract tests are load-bearing.
+4. **The browser talks only to the API.** Every number in the UI comes from a `fetch()` of a FastAPI endpoint backed by marts/artifacts — no in-browser math beyond formatting, no data files loaded directly by the frontend. API contract tests are load-bearing. (Static GitHub Pages edition: the same responses come from exported JSON; only the BOM tier split and share card render client-side from precomputed values — see docs/03_ARCHITECTURE.md §5.)
 5. **Tunables live in `config.yaml`** (α, β, τ, λ, μ, beam width) with documented defaults; never hardcode them.
 6. **Honest UI:** AI exposure always displays all three source bars and the agreement flag; the composite never appears alone.
 7. **Attribution:** the O*NET/BLS/AIOE/OpenAI/Microsoft attribution block from `docs/04_DATASETS.md` must remain in README and the app footer (CC BY 4.0 requirements).

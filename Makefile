@@ -1,4 +1,4 @@
-.PHONY: setup ingest build test app demo docker lint quality
+.PHONY: setup ingest build test app demo docker lint quality site
 
 PY := python3
 VENV := .venv
@@ -16,6 +16,9 @@ ingest:
 # Full pipeline: ingest -> normalize -> dbt build+test -> precompute -> report
 build:
 	$(BIN)/python flows/pipeline.py
+
+site:
+	$(BIN)/python -m skillbridge.export_static
 
 quality:
 	$(BIN)/python -m skillbridge.quality

@@ -1,14 +1,3 @@
----
-title: SkillBridge AI
-emoji: 🧭
-colorFrom: green
-colorTo: gray
-sdk: docker
-app_port: 8000
-pinned: false
-short_description: Career moves ranked by pay, retraining effort, AI risk
----
-
 # SkillBridge AI
 
 **Find realistic career moves with higher pay, smaller skill gaps, and lower AI exposure.**
@@ -26,7 +15,7 @@ you the exact **skill checklist** for the move you pick.
 > the frontier: they pay a little more but carry* ***more*** *AI exposure than
 > the teller job itself. That insight is the product.*
 
-**Live demo:** https://huggingface.co/spaces/YOUR-HF-USERNAME/skillbridge *(fill in after the Space is created)*
+**Live demo:** https://samysoserious.github.io/skillbridge/ — free static edition on GitHub Pages, built and deployed automatically by CI from the same pipeline.
 
 <!-- M4: pinned 30-second demo video goes here -->
 
@@ -129,6 +118,7 @@ O*NET descriptor space, free-text job input via embeddings.
 | `dbt/` | dbt-duckdb project: staging → core → marts + 50 tests |
 | `web/` | Hand-built frontend (tokens in `styles.css` per `docs/05_DESIGN.md`) |
 | `flows/pipeline.py` | Fail-fast pipeline runner (`make build`) |
+| `.github/workflows/` | CI (lint + tests) and the Pages deploy (pipeline → static export → publish) |
 | `data/sample/` | Synthetic CI fixture (labeled) |
 | `CLAUDE.md` | Working rules used to build this repo with Claude Code |
 
