@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_openai_exposure
+    columns:
+      - name: onet_soc_code
+        tests: [not_null, unique]
+      - name: exposure_beta
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+  - name: stg_aioe
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+  - name: stg_msft
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+  - name: stg_oews_wages
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+  - name: stg_onet_match
+    columns:
+      - name: occupation_name
+        tests: [not_null]
+  - name: stg_onet_tasks
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]

@@ -1,5 +1,9 @@
 # SkillBridge — Roadmap
 
+> **Status (2026-09-17): M0–M3 complete** on the local real-data edition (see 04_DATASETS.md).
+> Deferred to v1.1: metro wage map (needs bls.gov metro files), O*NET 31.0 full descriptor space.
+> Remaining for M4: deploy + demo video + LinkedIn GIF.
+
 Timeline assumes one developer, part-time (~10–15 h/week). Total: **~7 weeks to a deployed product** — the research estimate of 5–6 dev-weeks plus ~4 days for the hand-built frontend (the custom HTML/CSS/JS UI replaces Streamlit; see `05_DESIGN.md`).
 
 ```text

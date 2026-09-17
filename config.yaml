@@ -1,20 +1,30 @@
 # SkillBridge tunables — single source of truth (CLAUDE.md hard rule 5).
-# Documented defaults from docs/03_ARCHITECTURE.md §4.
+# Formulas: docs/03_ARCHITECTURE.md §4. Keep agreement_max_spread in sync
+# with dbt/dbt_project.yml (vars.agreement_spread).
 
 skill_gap:
-  alpha: 0.4        # weight of cosine distance term
-  beta: 0.6         # weight of positive descriptor-deficit term
+  alpha: 0.15       # weight of basic-skill cosine-distance term
+  beta: 0.25        # weight of positive skill-deficit term (what you lack)
+  gamma: 0.30       # weight of job-zone (education/preparation) deficit
+  delta: 0.30       # weight of task-content distance (TF-IDF over O*NET task statements)
 
 frontier:
   feasibility_tau_percentile: 65   # skill_gap <= this pct of all gaps from origin
+  max_job_zone_step_up: 1          # a single move can climb at most one O*NET Job Zone
+  min_target_employment: 20000     # targets need real national headcount (no wage-outlier niches)
 
 exposure:
-  agreement_max_spread: 0.25       # max-min pct rank <= this => sources agree
+  agreement_max_spread: 0.25       # max-min source pct rank <= this => sources agree
 
 paths:
   beam_width: 20
   max_hops: 3
-  lambda_gap: 1.0     # penalty on cumulative skill gap
-  mu_exposure: 1.0    # penalty on final AI exposure
-  min_wage_delta_pct: -5   # edges require wage_delta > -5%
+  lambda_gap: 2.0        # penalty on cumulative skill gap (0..1 per hop)
+  mu_exposure: 1.0       # penalty on final AI-exposure percentile (0..1)
+  min_wage_delta_pct: -5 # an edge requires wage_delta > -5% of the hop origin's wage
   top_k: 5
+
+bom:
+  relevant_importance_min: 0.30   # skill counts in the BOM when target importance >= this
+  transferable_tolerance: 0.05    # origin level >= target level - tolerance => transferable
+  upgrade_floor_ratio: 0.40       # origin level >= 40% of target level => upgrade, else acquire

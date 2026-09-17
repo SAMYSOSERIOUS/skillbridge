@@ -57,7 +57,7 @@
 │  All data via fetch() → the API above; zero in-browser math     │
 └─────────────────────────────────────────────────────────────────┘
 
-Orchestration: Prefect flow (ingest → dbt build → dbt test → precompute)
+Orchestration: flows/pipeline.py — plain fail-fast runner (ingest → normalize → dbt build+test → precompute → quality report)
 Packaging:     Docker (ONE image: FastAPI serves API + web/) ; Makefile targets
 CI:            GitHub Actions (lint, pytest, dbt test on sample data)
 Deploy:        Hugging Face Spaces (Docker mode) or Render/Fly.io — one container
@@ -72,7 +72,7 @@ Deploy:        Hugging Face Spaces (Docker mode) or Render/Fly.io — one contai
 | **Precomputed artifacts** | ~900×900 transition matrix is tiny (<1M pairs). Precompute once in the pipeline; the API only reads parquet → sub-50ms responses, no model server needed. |
 | **Custom HTML/CSS/JS frontend (no Streamlit, no framework)** | The UI is a designed product surface, not a notebook wrapper: full control of look and motion per `05_DESIGN.md`, and it demonstrates frontend skill. No React/build step in v1 — five views don't justify one, and a static folder keeps deploys trivial. Plotly.js in the browser gives the same interactive scatter/choropleth Streamlit would have, restyled. |
 | **FastAPI is the single backend** | The API *is* the product; the browser is one client and talks only to it (`fetch()`), which makes contract tests meaningful and makes the v2 React swap a pure frontend change. FastAPI also serves the static `web/` folder → one process, one Docker image, one deploy. |
-| **Prefect** | Lightweight orchestration that runs locally and in CI; demonstrates orchestration without requiring an Airflow server. |
+| **Plain pipeline runner** (`flows/pipeline.py`) | Five ordered fail-fast steps need no scheduler; a plain subprocess runner keeps `make build` dependency-light and readable. Prefect/Airflow are documented upgrades if scheduling ever matters. |
 
 ## 3. Data model (core tables)
 
@@ -97,8 +97,11 @@ mart_metro_wages           (from_soc, to_soc, area_code, wage_delta_metro)
 
 ### 4.1 Occupation vectors & skill gap
 - Vector: for each descriptor, `value = (IM/5) × LV`; z-normalize per descriptor across occupations.
-- **Skill gap (asymmetric — this matters):** cosine distance alone is symmetric, but moving Teller→Surgeon ≠ Surgeon→Teller. Gap = `α·cosine_distance + β·Σ max(0, target_LV − origin_LV) × target_IM_norm` over descriptors. Only *deficits* count. Defaults α=0.4, β=0.6; document sensitivity.
-- Validate against O*NET's own `Related Occupations` table: related pairs must rank in the top decile of similarity (a dbt/pytest assertion — a credibility feature reviewers can check).
+- **Skill gap (asymmetric — this matters):** cosine distance alone is symmetric, but moving Teller→Surgeon ≠ Surgeon→Teller. Four terms (weights in `config.yaml`):
+  `gap = α·cosine_distance + β·Σ max(0, target_LV − origin_LV) × target_IM_norm + γ·max(0, JZ_t − JZ_o)/4 + δ·(1 − task_similarity)`
+  Only *deficits* count in β and γ. The γ term is O*NET Job Zone (education/preparation) distance — without it, occupations with similar cognitive profiles but very different credentials look deceptively close. The δ term is TF-IDF cosine similarity over each occupation's 19k O*NET task statements — the domain-affinity signal ("processes financial transactions" vs "operates locomotives") that the 11 basic skills cannot carry. Defaults α=0.15, β=0.25, γ=0.30, δ=0.30.
+- Feasibility additionally requires: target Job Zone ≤ origin + 1 (one education level per move) and target national employment ≥ 20k (no wage-outlier niche occupations).
+- The Related-Occupations validation is deferred with the full O*NET 31.0 download (that table is not in the local-edition sources); the engine's synthetic-fixture tests cover frontier/gap/path correctness instead.
 
 ### 4.2 AI-exposure triangulation
 - Convert each source to a percentile rank (they use incompatible scales).
@@ -123,7 +126,7 @@ Design contract: **`docs/05_DESIGN.md`** (dark canvas, single green accent, typo
 - **View 2 — Frontier:** Plotly.js scatter (x = skill gap, y = wage delta, color = AI-exposure delta, glowing green markers = Pareto). Hover card: title, wage, exposure bars. Animated entry (points fade in, frontier polyline draws last — this is the GIF).
 - **Drawer — BOM:** slides in on target click; three sections (✅ transferable / 🟡 upgrade / 🔴 acquire), each skill with a gap bar; "top 3 to learn first" pinned; the "+$X/yr" figure rendered large per the design brief.
 - **View — Escape routes:** horizontal stepper `A → B → C` with per-hop wage/gap/exposure chips.
-- **View — Metro map:** Plotly.js choropleth of wage delta for the chosen transition; metro slider.
+- **View — Metro map (deferred to v1.1):** needs the OEWS metro files (direct bls.gov download); the local edition ships national wages only, per the scope-cut rule in 01_PLAN.md.
 - **Share card:** button calls `GET /card/{from}/{to}`; the PNG is rendered **server-side** (Pillow/plotly export) so the download is pixel-identical everywhere.
 - **States:** every view has designed loading, empty, and error states (see `05_DESIGN.md`); API errors surface as friendly copy ("We couldn't match that job title — try a broader one"), never raw JSON.
 

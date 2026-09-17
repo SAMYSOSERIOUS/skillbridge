@@ -1,0 +1,23 @@
+name: skillbridge
+version: "1.0.0"
+profile: skillbridge
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+
+vars:
+  # Mirrors config.yaml (exposure.agreement_max_spread); keep in sync.
+  agreement_spread: 0.25
+  # Crosswalk quality gate (docs/04_DATASETS.md D6)
+  min_crosswalk_coverage: 0.95
+
+models:
+  skillbridge:
+    staging:
+      +materialized: view
+    core:
+      +materialized: table
+    marts:
+      +materialized: table

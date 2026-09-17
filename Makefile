@@ -1,4 +1,4 @@
-.PHONY: setup ingest build test app demo docker lint
+.PHONY: setup ingest build test app demo docker lint quality
 
 PY := python3
 VENV := .venv
@@ -7,24 +7,31 @@ BIN := $(VENV)/bin
 setup:
 	$(PY) -m venv $(VENV)
 	$(BIN)/pip install --upgrade pip
-	$(BIN)/pip install -e ".[dev]"
+	$(BIN)/pip install -e ".[dev,data]"
 
+# Download the pinned real source files (GitHub only; idempotent)
 ingest:
 	$(BIN)/python -m skillbridge.ingest.run
 
+# Full pipeline: ingest -> normalize -> dbt build+test -> precompute -> report
 build:
-	@echo "M1+: dbt build + precompute (not yet implemented in M0)"
+	$(BIN)/python flows/pipeline.py
+
+quality:
+	$(BIN)/python -m skillbridge.quality
 
 lint:
-	$(BIN)/ruff check python tests
-	$(BIN)/ruff format --check python tests
+	$(BIN)/ruff check python tests flows
+	$(BIN)/ruff format --check python tests flows
 
 test: lint
 	$(BIN)/pytest -q
 
+# Real data (needs `make build` once first)
 app:
-	SKILLBRIDGE_DATA=data/sample $(BIN)/uvicorn skillbridge.api.main:app --host 0.0.0.0 --port 8000
+	$(BIN)/uvicorn skillbridge.api.main:app --host 0.0.0.0 --port 8000
 
+# Synthetic 5-occupation fixture - zero downloads (CI uses this)
 demo:
 	SKILLBRIDGE_DATA=data/sample $(BIN)/uvicorn skillbridge.api.main:app --host 0.0.0.0 --port 8000
 

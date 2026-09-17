@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: mart_occupations
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+  - name: mart_exposure_triangulated
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+      - name: exposure_composite
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+  - name: mart_skill_matrix
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [soc_code, skill]
+    columns:
+      - name: importance
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+      - name: skill_level
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1

@@ -3,7 +3,7 @@
 Context file for Claude when working in this repository. Read `docs/00_PROJECT_PROFILE.md` (what we're building and why it's unique), `docs/01_PLAN.md` (milestones + quality bars), `docs/02_ROADMAP.md` (order of work), `docs/03_ARCHITECTURE.md` (how it's built), `docs/04_DATASETS.md` (data sources — the source of truth for acquisition and joins), and `docs/05_DESIGN.md` (the frontend design contract).
 
 ## What this project is
-SkillBridge is an AI-era career navigation engine. Signature mechanic: the **Pareto Reskilling Frontier** — for any occupation, the set of career transitions that jointly maximize wage gain and minimize both retraining effort and AI-displacement exposure, computed from O*NET 31.0 + BLS OEWS + three AI-exposure indices (AIOE, OpenAI GPTs-are-GPTs, Microsoft Working-with-AI). Plus: Skill-Gap Bill of Materials, multi-hop Escape Routes, Metro Wage-Arbitrage map, shareable Escape Plan card.
+SkillBridge is an AI-era career navigation engine. Signature mechanic: the **Pareto Reskilling Frontier** — for any occupation, the set of career transitions that jointly maximize wage gain and minimize both retraining effort and AI-displacement exposure, computed from real O*NET data + BLS OEWS + three AI-exposure indices (local edition per docs/04_DATASETS.md) (AIOE, OpenAI GPTs-are-GPTs, Microsoft Working-with-AI). Plus: Skill-Gap Bill of Materials, multi-hop Escape Routes, shareable Escape Plan card (Metro Wage-Arbitrage map deferred to v1.1).
 
 The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as static files by FastAPI — no Streamlit, no React, no build step. Plotly.js is the only runtime library. Its look and motion are defined in `docs/05_DESIGN.md`.
 
@@ -12,10 +12,10 @@ The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as stati
 ## Commands
 - `make setup` — create venv, install deps
 - `make ingest` — download all sources to `data/raw/` (idempotent; never re-download if checksums match)
-- `make build` — dbt build + precompute engine artifacts
+- `make build` — full pipeline via flows/pipeline.py: ingest → normalize → dbt build+test → precompute → data-quality report
 - `make test` — ruff + pytest + dbt test (must be green before any milestone is called done)
 - `make app` — uvicorn: one FastAPI process serving the API **and** the `web/` frontend
-- `make demo` — full app on the bundled 20-occupation sample in `data/sample/` (no network). CI uses this.
+- `make demo` — app on the bundled synthetic 5-occupation fixture in `data/sample/` (no network). CI uses this.
 
 ## Hard rules
 1. **Never invent data.** All values come from the real files listed in `docs/04_DATASETS.md`. If a download fails or a schema differs from the doc, stop, report, and update the doc in the same commit as the code fix. No synthetic placeholder values outside `data/sample/` fixtures (which are clearly labeled).
@@ -33,7 +33,7 @@ The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as stati
 - Package layout per `docs/03_ARCHITECTURE.md` §7 (`python/skillbridge/{ingest,engine,api,cards}` + static `web/`).
 - Frontend: vanilla ES modules in `web/app.js`, CSS custom properties from `05_DESIGN.md` in `web/styles.css`, semantic HTML in `web/index.html`. Plotly.js vendored or pinned; Inter self-hosted in `web/fonts/`. No frameworks, no bundlers, no npm.
 - DuckDB + dbt-duckdb; marts are the API's only data dependency (served from precomputed parquet in `data/artifacts/`).
-- Prefect flow in `flows/pipeline.py` orchestrates ingest → dbt build → dbt test → precompute.
+- `flows/pipeline.py` (plain fail-fast runner) orchestrates ingest → normalize → dbt build+test → precompute → quality report.
 - Keep functions small and testable; the engine (`vectors/distance/frontier/paths/bom`) is pure (no I/O) so it can be tested on fixtures.
 - Commit style: `feat|fix|data|docs|test(scope): message`; one milestone-relevant change per commit.
 

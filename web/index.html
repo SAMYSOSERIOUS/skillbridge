@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SkillBridge — where should your career go next?</title>
+  <meta name="description" content="Real career moves ranked by pay gain, retraining effort, and AI risk — from O*NET, BLS, and three AI-exposure indices.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101312'/%3E%3Cpath d='M6 22 L14 14 L20 17 L26 8' stroke='%232ee08a' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -11,9 +13,9 @@
     <header class="topbar">
       <span class="wordmark">SKILLBRIDGE</span>
       <nav class="nav">
-        <a href="#" aria-disabled="true">Methodology</a>
-        <a href="#" aria-disabled="true">Data</a>
-        <a href="#" aria-disabled="true">About</a>
+        <a href="#methodology">Methodology</a>
+        <a href="#data">Data</a>
+        <a href="#about">About</a>
       </nav>
     </header>
 
@@ -21,13 +23,19 @@
       <section class="hero" id="hero">
         <h1>Where should your career go next?</h1>
         <p class="subtitle">Real moves, ranked by pay gain, retraining effort, and AI risk.</p>
-        <form class="search" id="search-form" autocomplete="off">
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Enter your current job title"
-            aria-label="Your current job title"
-          >
+        <form class="search" id="search-form" autocomplete="off" role="search">
+          <div class="search-box">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Enter your current job title"
+              aria-label="Your current job title"
+              aria-expanded="false"
+              aria-controls="autocomplete"
+              role="combobox"
+            >
+            <ul id="autocomplete" class="autocomplete" role="listbox" hidden></ul>
+          </div>
           <button type="submit" class="btn-primary">Find my moves</button>
         </form>
         <button type="button" class="chip" id="try-demo">Try: Bank Teller</button>
@@ -35,29 +43,101 @@
       </section>
 
       <section class="results" id="results" hidden>
+        <div class="results-head">
+          <h2 id="results-title"></h2>
+          <p class="results-sub" id="results-sub"></p>
+        </div>
         <div class="grid">
           <div class="panel chart-panel">
-            <p class="panel-label">Your Pareto frontier</p>
-            <div
-              id="frontier-chart"
-              role="img"
-              aria-label="Scatter chart of career moves; green points are the frontier."
-            ></div>
+            <p class="panel-label">Your Pareto frontier — green moves can't be beaten on all three counts</p>
+            <div id="frontier-chart" role="img" aria-label="Scatter chart of career moves. Green points are the frontier."></div>
+            <p class="hint">Click any point to see exactly which skills the move needs.</p>
           </div>
           <aside class="rail">
             <div class="panel best-move" id="best-move"></div>
             <div class="panel exposure-panel" id="exposure-panel"></div>
           </aside>
         </div>
+
+        <div class="panel routes-panel">
+          <p class="panel-label">Escape routes — multi-step ladders when one jump isn't enough</p>
+          <div id="routes"></div>
+        </div>
+
         <p class="note" id="synthetic-note" hidden>
-          Demo mode — synthetic fixture data. Real O*NET / BLS / AI-exposure data lands in Phase 1.
+          Demo mode — synthetic fixture data, not real statistics. Run <code>make build</code> for the real dataset.
         </p>
+      </section>
+
+      <section class="explainer" id="methodology">
+        <h2>How this works</h2>
+        <div class="explainer-grid">
+          <div>
+            <h3>The frontier</h3>
+            <p>For your occupation, SkillBridge scores a move to every other occupation on three things at once:
+            <strong>pay gain</strong> (median wage difference), <strong>retraining effort</strong>
+            (a skill-gap score built from O*NET skill levels, education zones, and how similar the day-to-day
+            tasks actually are), and <strong>AI risk change</strong> (three independent research indices, combined).
+            The green frontier is the set of moves where you can't do better on one count without giving up another.</p>
+          </div>
+          <div>
+            <h3>Retraining effort</h3>
+            <p>The score adds four ingredients: how different the skill profiles are, how much you'd need to
+            <em>level up</em> skills you already have (moving up costs more than moving down), whether the job
+            needs a higher education/preparation level (O*NET Job Zones — a single move can climb at most one),
+            and how different the actual work tasks are, measured on 19,000 real O*NET task statements.
+            Moves also need real national headcount, so wage-outlier niche jobs don't show up.</p>
+          </div>
+          <div>
+            <h3>AI risk, honestly</h3>
+            <p>Nobody can measure AI displacement precisely, so SkillBridge never shows one number alone.
+            Three independent sources — an academic ability-based index (AIOE), OpenAI's task-based ratings,
+            and Microsoft Research's score from observed real Copilot usage — are each shown as percentiles,
+            with a flag when they disagree. Disagreement is information, not noise.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="explainer" id="data">
+        <h2>Data &amp; limitations</h2>
+        <div class="explainer-grid">
+          <div>
+            <h3>Sources</h3>
+            <ul id="meta-sources">
+              <li>O*NET basic skills, Job Zones &amp; 19k task statements (US Dept. of Labor)</li>
+              <li>BLS OEWS national median wages, May 2021 release</li>
+              <li>AIOE index — Felten, Raj &amp; Seamans (2021)</li>
+              <li>"GPTs are GPTs" — OpenAI / Eloundou et al. (MIT license)</li>
+              <li>"Working with AI" — Microsoft Research (CC BY 4.0)</li>
+            </ul>
+          </div>
+          <div>
+            <h3>What this can't tell you</h3>
+            <ul>
+              <li>O*NET profiles describe the <em>typical</em> job holder, not you — treat moves as estimates of typical feasibility, not personal guarantees.</li>
+              <li>Exposure indices measure <em>exposure</em>, not certain job loss; the sources legitimately disagree for some occupations.</li>
+              <li>Wages are national point-in-time medians — no cost-of-living adjustment; top-coded wages (≥ $208k/yr in this release) are flagged, not guessed.</li>
+              <li>This is analysis of public data, not career advice.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Build</h3>
+            <p id="meta-build">Loading build info…</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="explainer" id="about">
+        <h2>About</h2>
+        <p class="about-p">SkillBridge is an open-source portfolio project: a multi-objective career decision engine,
+        not a job-similarity recommender. Every number on this page comes from the public datasets above through a
+        tested data pipeline (DuckDB + dbt), and every formula and threshold is documented in the repository.</p>
       </section>
     </main>
 
     <footer class="footer">
       <p>
-        This product uses the O*NET 31.0 Database by the U.S. Department of Labor,
+        This product uses the O*NET Database by the U.S. Department of Labor,
         Employment and Training Administration (USDOL/ETA), used under the CC BY 4.0 license.
         Wage data: U.S. Bureau of Labor Statistics, OEWS. AI-exposure indices:
         Felten, Raj &amp; Seamans (AIOE); Eloundou et al. (OpenAI, MIT license);
@@ -67,7 +147,14 @@
     </footer>
   </div>
 
-  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <!-- BOM drawer -->
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="drawer" id="drawer" hidden aria-label="Skill gap breakdown">
+    <button class="drawer-close" id="drawer-close" aria-label="Close">×</button>
+    <div id="drawer-content"></div>
+  </aside>
+
+  <script src="/plotly.min.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,9 @@
+skillbridge:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      # Resolved relative to the working directory; run dbt from the repo
+      # root (the Makefile does).
+      path: "{{ env_var('SKILLBRIDGE_DB', 'data/skillbridge.duckdb') }}"
+      threads: 4

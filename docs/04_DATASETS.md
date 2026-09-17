@@ -4,6 +4,33 @@ Every dataset below is real, publicly accessible, and was verified during resear
 
 ---
 
+## Local edition (v1, what `make ingest` actually downloads)
+
+The v1 build is fully reproducible from **GitHub only** (works in restricted
+networks): every file is pinned to an exact commit and checksummed by
+`skillbridge.ingest` (see `python/skillbridge/ingest/sources.py`). All values
+are real; nothing is synthesized outside `data/sample/`.
+
+| key | file | provenance | role |
+|---|---|---|---|
+| `openai` | `occ_level.csv` | openai/GPTs-are-GPTs (MIT) | LLM exposure (human beta ratings), O*NET-SOC spine |
+| `onet_skills` | `occupations_onet_basic_skills.csv` | O*NET via the MIT repo | 11 basic skills, importance + level (0-100), Job Zones |
+| `onet_tasks` | `full_onet_data.tsv` | O*NET via the MIT repo | 19k task statements (task-content similarity) |
+| `onet_match` | `occupations_onet_bls_matched.csv` | the MIT repo | occupation-name -> SOC crosswalk input |
+| `oews` | `national_May2021_dl.csv` | BLS OEWS May 2021 (US Gov) | national wages incl. suppression/top-codes |
+| `aioe` | `Language Modeling AIOE and AIIE.xlsx` | AIOE-Data/AIOE | exposure channel 1 |
+| `msft` | `ai_applicability_scores.csv` | microsoft/working-with-ai (CC BY 4.0) | exposure channel 3 |
+
+Top-code note: in the May 2021 OEWS release, `#` means an annual wage
+>= $208,000; SkillBridge stores it as NULL + `wage_topcoded` flag.
+
+**Documented upgrades (v1.1+):** D1's full O*NET 31.0 descriptor space
+(200+ descriptors) and D2's May 2025 OEWS metro files (the Metro
+Wage-Arbitrage map) require direct downloads from onetcenter.org /
+bls.gov and slot into the same staging models.
+
+---
+
 ## D1. O*NET 31.0 Database (core skills ontology)
 
 - **Publisher:** US Department of Labor / Employment and Training Administration (O*NET Resource Center)

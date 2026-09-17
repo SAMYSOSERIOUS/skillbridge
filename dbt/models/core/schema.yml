@@ -1,0 +1,37 @@
+version: 2
+
+models:
+  - name: dim_occupation
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+      - name: title
+        tests: [not_null]
+  - name: dim_soc_crosswalk
+    columns:
+      - name: occupation_name
+        tests: [not_null, unique]
+      - name: soc_code
+        tests: [not_null]
+  - name: fct_wages
+    columns:
+      - name: soc_code
+        tests: [not_null, unique]
+  - name: fct_ai_exposure
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [soc_code, source]
+    columns:
+      - name: source
+        tests:
+          - accepted_values:
+              values: ['aioe', 'openai', 'msft']
+      - name: score_pct_rank
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+  - name: fct_occupation_skill
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [soc_code, skill]

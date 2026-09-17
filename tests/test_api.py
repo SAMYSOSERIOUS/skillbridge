@@ -1,8 +1,8 @@
 """API contract tests (load-bearing: the browser depends on these shapes).
 
-They run against the bundled synthetic fixture, so CI needs no downloads.
-When M2 swaps the fixture for real precomputed artifacts, these tests must
-keep passing unchanged - that is the contract.
+They are mode-agnostic: they pass against the bundled synthetic fixture
+(CI, `make demo`) and against real artifacts (`make build` + `make app`)
+without modification - that is the contract.
 """
 
 from fastapi.testclient import TestClient
@@ -17,7 +17,9 @@ LOAN_OFFICER = "13-2072"
 def test_health():
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["mode"] in ("sample", "real")
 
 
 def test_occupation_search_shape():
@@ -26,7 +28,8 @@ def test_occupation_search_shape():
     body = r.json()
     assert body["results"], "search for 'teller' must return at least one hit"
     hit = body["results"][0]
-    assert set(hit) == {"soc_code", "title", "display_title"}
+    assert {"soc_code", "title", "display_title", "servable"} <= set(hit)
+    assert "teller" in (hit["title"] + hit["display_title"]).lower()
 
 
 def test_occupation_search_caps_at_8():
@@ -38,12 +41,21 @@ def test_transitions_shape_and_frontier():
     r = client.get(f"/api/transitions/{TELLER}")
     assert r.status_code == 200
     body = r.json()
-    assert body["origin"]["display_title"] == "Bank Teller"
+    assert "teller" in body["origin"]["display_title"].lower()
+    assert body["origin"]["wage_median"] > 0
     keys = {"to_soc", "to_title", "skill_gap", "wage_delta", "exposure_delta", "pareto", "feasible"}
     for t in body["transitions"]:
         assert keys <= set(t)
     assert any(t["pareto"] for t in body["transitions"]), "frontier must be non-empty"
-    assert body["synthetic"] is True, "sample mode must self-identify as synthetic"
+    assert isinstance(body["synthetic"], bool)
+
+
+def test_transitions_best_move_is_on_frontier_with_pay_gain():
+    r = client.get(f"/api/transitions/{TELLER}")
+    best = r.json().get("best_move")
+    if best is not None:  # sample fixture may not carry one
+        assert best["pareto"] is True
+        assert best["wage_delta"] > 0
 
 
 def test_transitions_unknown_occupation_is_friendly():
@@ -64,7 +76,9 @@ def test_bom_three_tiers():
 def test_paths_shape():
     r = client.get(f"/api/paths/{TELLER}")
     assert r.status_code == 200
-    path = r.json()["paths"][0]
+    body = r.json()
+    assert body["paths"], "escape routes must exist for the demo occupation"
+    path = body["paths"][0]
     assert len(path["hops"]) >= 2
     assert {"cumulative_wage_delta", "cumulative_skill_gap", "final_exposure"} <= set(path)
 
@@ -75,6 +89,19 @@ def test_exposure_always_has_all_three_sources():
     assert r.status_code == 200
     exp = r.json()["exposure"]
     assert {"aioe", "openai", "msft", "composite", "agreement"} <= set(exp)
+
+
+def test_meta_transparency():
+    r = client.get("/api/meta")
+    assert r.status_code == 200
+    assert "mode" in r.json()
+
+
+def test_share_card_is_png():
+    r = client.get(f"/api/card/{TELLER}/{LOAN_OFFICER}")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_root_serves_frontend():
