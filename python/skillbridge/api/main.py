@@ -34,6 +34,18 @@ def _score(t: dict, origin_wage: float) -> float:
     )
 
 
+def pick_best_moves(trans: list[dict], origin_wage: float) -> tuple[dict | None, dict | None]:
+    """The two panel picks: biggest win (best score) and closest win
+    (least retraining) among frontier moves with a pay gain. The pair tells
+    the whole story - the moonshot and the next step."""
+    positive_pareto = [t for t in trans if t["pareto"] and t["wage_delta"] > 0]
+    best = max(positive_pareto, key=lambda t: _score(t, origin_wage), default=None)
+    closest = min(positive_pareto, key=lambda t: t["skill_gap"], default=None)
+    if closest is best:
+        closest = None
+    return best, closest
+
+
 @app.get("/api/health")
 def health() -> dict:
     data = store.load()
@@ -88,8 +100,7 @@ def transitions(soc: str) -> dict:
         raise HTTPException(status_code=404, detail=NOT_FOUND_MSG)
 
     origin_wage = occ["wage_median"] or 0
-    positive_pareto = [t for t in trans if t["pareto"] and t["wage_delta"] > 0]
-    best = max(positive_pareto, key=lambda t: _score(t, origin_wage), default=None)
+    best, closest = pick_best_moves(trans, origin_wage)
 
     return {
         "origin": {
@@ -100,6 +111,7 @@ def transitions(soc: str) -> dict:
         },
         "transitions": trans,
         "best_move": best,
+        "best_close": closest,
         "synthetic": data["synthetic"],
     }
 

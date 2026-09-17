@@ -429,19 +429,39 @@ function renderChart(trans) {
 
 function renderBestMove(trans) {
   const best = trans.best_move;
+  const close = trans.best_close;
   if (!best) {
     $("best-move").innerHTML =
-      '<p class="label">Best move</p><p class="meta">No frontier move with a pay gain was found for this occupation.</p>';
+      '<p class="label">Best moves</p><p class="meta">No frontier move with a pay gain was found for this occupation.</p>';
     return;
   }
-  $("best-move").innerHTML = `
-    <p class="label">Best move</p>
-    <p class="title">${best.to_title}</p>
-    <p class="wage" id="best-wage">${fmtSigned(best.wage_delta)}</p>
-    <p class="meta">AI risk ${best.exposure_delta < 0 ? "↓ lower" : "↑ higher"} · on the frontier</p>
-    <button class="open-bom" id="best-bom">Which skills do I need?</button>
-  `;
+  const pick = (id, kind, t, metaText) => `
+    <button class="pick" id="${id}">
+      <p class="kind">${kind}</p>
+      <p class="title">${t.to_title}</p>
+      <p class="wage">${fmtSigned(t.wage_delta)}</p>
+      <p class="meta">${metaText} · click for the skill checklist</p>
+    </button>`;
+  let html = `<p class="label">Best moves on your frontier</p>`;
+  html += pick(
+    "best-bom",
+    "🚀 Biggest win",
+    best,
+    `AI risk ${best.exposure_delta < 0 ? "↓ lower" : "↑ higher"} · most ambitious`
+  );
+  if (close) {
+    html += pick(
+      "close-bom",
+      "🎯 Closest win",
+      close,
+      `AI risk ${close.exposure_delta < 0 ? "↓ lower" : "↑ higher"} · least retraining`
+    );
+  }
+  $("best-move").innerHTML = html;
   $("best-bom").addEventListener("click", () => openBom(current.originSoc, best.to_soc));
+  if (close) {
+    $("close-bom").addEventListener("click", () => openBom(current.originSoc, close.to_soc));
+  }
 }
 
 function renderExposure(exposure) {
@@ -454,7 +474,7 @@ function renderExposure(exposure) {
   const bars = entries
     .map(
       ([, v]) =>
-        `<div class="bar" style="height:${v == null ? 4 : Math.max(4, Math.round(v * 100))}%"></div>`
+        `<div class="bar" data-h="${v == null ? 4 : Math.max(4, Math.round(v * 100))}"></div>`
     )
     .join("");
   const pcts = entries
@@ -470,6 +490,13 @@ function renderExposure(exposure) {
       ${e.agreement ? "Sources agree." : "Sources disagree - read with care."}
     </p>
   `;
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      for (const bar of document.querySelectorAll(".exposure-panel .bar")) {
+        bar.style.height = `${bar.dataset.h}%`;
+      }
+    })
+  );
 }
 
 function renderRoutes(pathsBody) {
@@ -501,7 +528,7 @@ function tierBlock(name, cls, items, note) {
       <div class="skill-row">
         <div class="skill-head"><span>${s.skill}</span>
           <span class="lv">${s.origin_level} → ${s.target_level}</span></div>
-        <div class="gap-track"><div class="gap-fill" style="width:${Math.min(100, Math.round((s.gap / 100) * 100))}%"></div></div>
+        <div class="gap-track"><div class="gap-fill" data-w="${Math.min(100, Math.round((s.gap / 100) * 100))}"></div></div>
       </div>`
         )
         .join("")
@@ -540,6 +567,13 @@ async function openBom(fromSoc, toSoc) {
     if (STATIC) {
       $("share-card").addEventListener("click", () => downloadCard(b, fromSoc, toSoc));
     }
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        for (const bar of document.querySelectorAll(".drawer .gap-fill")) {
+          bar.style.width = `${bar.dataset.w}%`;
+        }
+      })
+    );
     countUp($("bom-wage"), b.wage_delta);
   } catch (e) {
     $("drawer-content").innerHTML = `<h2>Skill gap</h2><p class="pair">${e.message}</p>`;
@@ -680,4 +714,123 @@ document.addEventListener("keydown", (e) => {
   } catch {
     $("meta-build").textContent = "Build info unavailable.";
   }
+})();
+
+/* ---------- Wow layer: hero constellation + scroll reveals ---------- */
+
+(() => {
+  if (reducedMotion) return;
+  const canvas = $("constellation");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const hero = canvas.parentElement;
+  const mouse = { x: -9999, y: -9999 };
+  let dots = [];
+  let raf = null;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = hero.clientWidth * dpr;
+    canvas.height = hero.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.min(70, Math.floor(hero.clientWidth / 16));
+    dots = Array.from({ length: n }, () => ({
+      x: Math.random() * hero.clientWidth,
+      y: Math.random() * hero.clientHeight,
+      vx: (Math.random() - 0.5) * 0.22,
+      vy: (Math.random() - 0.5) * 0.22,
+      r: 1.2 + Math.random() * 1.6,
+      green: Math.random() < 0.18,
+    }));
+  }
+
+  function tick() {
+    const w = hero.clientWidth;
+    const h = hero.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    for (const d of dots) {
+      // gentle drift + soft repulsion from the mouse
+      const dx = d.x - mouse.x;
+      const dy = d.y - mouse.y;
+      const dist2 = dx * dx + dy * dy;
+      if (dist2 < 120 * 120) {
+        const f = 14 / Math.max(dist2, 200);
+        d.vx += dx * f * 0.6;
+        d.vy += dy * f * 0.6;
+      }
+      d.vx *= 0.985;
+      d.vy *= 0.985;
+      d.x += d.vx;
+      d.y += d.vy;
+      if (d.x < 0 || d.x > w) d.vx *= -1;
+      if (d.y < 0 || d.y > h) d.vy *= -1;
+      d.x = Math.max(0, Math.min(w, d.x));
+      d.y = Math.max(0, Math.min(h, d.y));
+    }
+
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const a = dots[i];
+        const b = dots[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 95 * 95) {
+          const alpha = 0.1 * (1 - Math.sqrt(d2) / 95);
+          ctx.strokeStyle = `rgba(138, 148, 142, ${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    for (const d of dots) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = d.green ? "rgba(46, 224, 138, 0.55)" : "rgba(111, 122, 116, 0.45)";
+      ctx.fill();
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  hero.addEventListener("mousemove", (e) => {
+    const rect = hero.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  hero.addEventListener("mouseleave", () => {
+    mouse.x = -9999;
+    mouse.y = -9999;
+  });
+  window.addEventListener("resize", resize);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelAnimationFrame(raf);
+    else raf = requestAnimationFrame(tick);
+  });
+  resize();
+  raf = requestAnimationFrame(tick);
+})();
+
+(() => {
+  const revealables = document.querySelectorAll(".reveal");
+  if (!revealables.length || !("IntersectionObserver" in window)) {
+    for (const el of revealables) el.classList.add("visible");
+    return;
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+          io.unobserve(entry.target);
+        }
+      }
+    },
+    { threshold: 0.12 }
+  );
+  for (const el of revealables) io.observe(el);
 })();

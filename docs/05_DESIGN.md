@@ -101,3 +101,26 @@ Same tokens as the app: `--bg` canvas, wordmark top-left, "Bank Teller → Loan 
 - The frontier also exists as a ranked list ("Top moves") for screen readers and as the fallback view — it's the same data, sorted.
 - `alt`/`aria-label` on the chart region summarizing the top 3 moves in words.
 - Lighthouse (desktop): ≥90 accessibility, ≥90 performance. The page ships < 1MB excluding Plotly.js.
+
+## 10. Motion & identity upgrade (v1.1 of this brief)
+
+- **Logo:** an inline SVG mark — the rising frontier polyline with an endpoint
+  dot, in `--accent`, 26px in the top bar. On load the line draws itself
+  (~900ms) and the dot pops in; matches the favicon.
+- **Hero constellation:** a canvas layer behind the hero content: ~70 drifting
+  dots (18% accent-green — the frontier motif), faint lines between near
+  neighbors, soft repulsion within ~120px of the cursor. Subtle by contract:
+  line alpha <= 0.1, dot alpha <= 0.55, no interference with text. Disabled
+  entirely under `prefers-reduced-motion` and when the tab is hidden.
+- **Scroll reveals:** methodology/data/about sections fade-and-rise once
+  (IntersectionObserver), 600ms ease.
+- **Data motion:** exposure bars grow to their percentile height (700ms);
+  BOM gap bars fill to width (600ms); both are one-shot, meaning-carrying
+  animations in the §5 spirit.
+- **Chart legend:** a plain-language legend strip above the frontier chart
+  (green = can't-be-beaten deal, gray = beaten, click a dot for skills).
+  No jargon in the chart chrome; "Pareto" stays in Methodology.
+- **Best-moves panel:** two picks, both clickable: "🚀 Biggest win" (highest
+  balanced score) and "🎯 Closest win" (least retraining) — the moonshot and
+  the next step, so one extreme number can never mislead. Below it, the
+  licensing honesty note (pilots/controllers/healthcare).

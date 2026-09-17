@@ -11,7 +11,15 @@
 <body>
   <div class="page">
     <header class="topbar">
-      <span class="wordmark">SKILLBRIDGE</span>
+      <a class="brand" href="#hero" aria-label="SkillBridge home">
+        <svg class="logo" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+          <path class="logo-path" d="M3 21 L10 13 L15 16 L23 5"
+                fill="none" stroke="var(--accent)" stroke-width="2.4"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <circle class="logo-dot" cx="23" cy="5" r="2.6" fill="var(--accent)"/>
+        </svg>
+        <span class="wordmark">SKILLBRIDGE</span>
+      </a>
       <nav class="nav">
         <a href="#methodology">Methodology</a>
         <a href="#data">Data</a>
@@ -21,6 +29,8 @@
 
     <main>
       <section class="hero" id="hero">
+        <canvas id="constellation" aria-hidden="true"></canvas>
+        <div class="hero-content">
         <h1>Where should your career go next?</h1>
         <p class="subtitle">Real moves, ranked by pay gain, retraining effort, and AI risk.</p>
         <form class="search" id="search-form" autocomplete="off" role="search">
@@ -40,6 +50,7 @@
         </form>
         <button type="button" class="chip" id="try-demo">Try: Bank Teller</button>
         <p class="error" id="search-error" hidden></p>
+        </div>
       </section>
 
       <section class="results" id="results" hidden>
@@ -49,12 +60,19 @@
         </div>
         <div class="grid">
           <div class="panel chart-panel">
-            <p class="panel-label">Your Pareto frontier — green moves can't be beaten on all three counts</p>
+            <p class="panel-label">Your map of realistic moves</p>
+            <div class="legend">
+              <span class="legend-item"><span class="dot dot-green"></span>green = a best possible deal — no other move beats it on pay, effort, and AI risk at once</span>
+              <span class="legend-item"><span class="dot dot-gray"></span>gray = beaten by a green move</span>
+              <span class="legend-item"><span class="dot dot-click">👆</span>click any dot for its skill checklist</span>
+            </div>
             <div id="frontier-chart" role="img" aria-label="Scatter chart of career moves. Green points are the frontier."></div>
             <p class="hint">Click any point to see exactly which skills the move needs.</p>
           </div>
           <aside class="rail">
             <div class="panel best-move" id="best-move"></div>
+            <p class="license-note">Some jobs (pilots, controllers, healthcare) also need licenses and
+            certified hours the data can't see — treat those as long-term ambitions.</p>
             <div class="panel exposure-panel" id="exposure-panel"></div>
           </aside>
         </div>
@@ -69,7 +87,7 @@
         </p>
       </section>
 
-      <section class="explainer" id="methodology">
+      <section class="explainer reveal" id="methodology">
         <h2>How this works</h2>
         <div class="explainer-grid">
           <div>
@@ -98,7 +116,7 @@
         </div>
       </section>
 
-      <section class="explainer" id="data">
+      <section class="explainer reveal" id="data">
         <h2>Data &amp; limitations</h2>
         <div class="explainer-grid">
           <div>
@@ -117,6 +135,7 @@
               <li>O*NET profiles describe the <em>typical</em> job holder, not you — treat moves as estimates of typical feasibility, not personal guarantees.</li>
               <li>Exposure indices measure <em>exposure</em>, not certain job loss; the sources legitimately disagree for some occupations.</li>
               <li>Wages are national point-in-time medians — no cost-of-living adjustment; top-coded wages (≥ $208k/yr in this release) are flagged, not guessed.</li>
+              <li>Licensed occupations (pilots, air-traffic control, healthcare) require certifications and hour requirements the model cannot measure.</li>
               <li>This is analysis of public data, not career advice.</li>
             </ul>
           </div>
@@ -127,7 +146,7 @@
         </div>
       </section>
 
-      <section class="explainer" id="about">
+      <section class="explainer reveal" id="about">
         <h2>About</h2>
         <p class="about-p">SkillBridge is an open-source portfolio project: a multi-objective career decision engine,
         not a job-similarity recommender. Every number on this page comes from the public datasets above through a

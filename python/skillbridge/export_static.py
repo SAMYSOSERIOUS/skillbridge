@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from skillbridge.api import store
-from skillbridge.api.main import _score
+from skillbridge.api.main import pick_best_moves
 from skillbridge.config import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -61,8 +61,7 @@ def main() -> int:
     for soc, trans in data["transitions"].items():
         origin = data["occupations"][soc]
         origin_wage = origin["wage_median"] or 0
-        positive_pareto = [t for t in trans if t["pareto"] and t["wage_delta"] > 0]
-        best = max(positive_pareto, key=lambda t: _score(t, origin_wage), default=None)
+        best, closest = pick_best_moves(trans, origin_wage)
         bundle = {
             "origin": {
                 "soc_code": origin["soc_code"],
@@ -72,6 +71,7 @@ def main() -> int:
             },
             "transitions": trans,
             "best_move": best,
+            "best_close": closest,
             "paths": data["paths"].get(soc, []),
             "synthetic": False,
         }
