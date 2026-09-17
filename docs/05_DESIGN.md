@@ -124,3 +124,34 @@ Same tokens as the app: `--bg` canvas, wordmark top-left, "Bank Teller → Loan 
   balanced score) and "🎯 Closest win" (least retraining) — the moonshot and
   the next step, so one extreme number can never mislead. Below it, the
   licensing honesty note (pilots/controllers/healthcare).
+
+
+## 11. v3 — the adopted product design (supersedes §2–§7 for web/)
+
+The stakeholder prototype (SkillBridge_App.html) is now the canonical UI,
+implemented 1:1 on real data (docs/07_UI_GAP_ANALYSIS.md is the contract for
+what each element shows). What changes and what holds:
+
+- **Accent becomes clay-orange `#ff7a59`** (was Pareto green). Still exactly
+  one saturated accent; the dark green-gray canvas tokens remain.
+- **Typeface becomes Geist**, self-hosted inside the single-file bundle
+  (no font CDN at runtime).
+- **The frontend is one self-contained file** (`web/index.html`): React
+  runtime, fonts, layout and logic embedded. Editable sources live in
+  `web/src/` (layout.html + component.js); `python tools/rebundle.py`
+  rebuilds the file. No npm, no build toolchain.
+- **Three views of the same data**: 3-D pillar map (auto-orbit, drag, hover
+  pause, 3-step guided tour, top-10 labeled), flat chart (all moves), ranked
+  list. Last view remembered locally.
+- **Priority sliders** (pay / speed / AI safety) re-rank the recommendation;
+  the frontier itself never changes, and "Why this move?" prints the
+  reasoning including the user's weights.
+- **Skill-plan drawer**: floating 3-layer skill stack, must-learn/upgrade/have
+  tiers with real O*NET levels, copy-skills-for-resume, date-planned
+  milestones (suggested from Job-Zone bands, user-editable), save / email /
+  compare. License line reads "Not tracked in v1" until a real source exists.
+- **Empty state ("no better move")** is a first-class scene (summit), with
+  real alternatives listed when the data has them.
+- Honesty rules carried over: three exposure sources always shown (now as a
+  range bar + per-source rows + spread note), field-size tags from real
+  employment, real build date, reduced-motion supported throughout.

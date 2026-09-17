@@ -5,7 +5,7 @@ Context file for Claude when working in this repository. Read `docs/00_PROJECT_P
 ## What this project is
 SkillBridge is an AI-era career navigation engine. Signature mechanic: the **Pareto Reskilling Frontier** — for any occupation, the set of career transitions that jointly maximize wage gain and minimize both retraining effort and AI-displacement exposure, computed from real O*NET data + BLS OEWS + three AI-exposure indices (local edition per docs/04_DATASETS.md) (AIOE, OpenAI GPTs-are-GPTs, Microsoft Working-with-AI). Plus: Skill-Gap Bill of Materials, multi-hop Escape Routes, shareable Escape Plan card (Metro Wage-Arbitrage map deferred to v1.1).
 
-The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as static files by FastAPI — no Streamlit, no React, no build step. Plotly.js is the only runtime library. Its look and motion are defined in `docs/05_DESIGN.md`.
+The frontend is a **single self-contained file** (`web/index.html`; sources in `web/src/`, rebuilt by `python tools/rebundle.py`) — the adopted stakeholder design: embedded React runtime + Geist fonts, 3-D frontier map, priority sliders, skill-plan drawer. No npm, no build toolchain, no CDN at runtime. Look and wiring: `docs/05_DESIGN.md` §11 and `docs/07_UI_GAP_ANALYSIS.md`.
 
 **Identity features — never cut or stub these:** Pareto frontier, BOM, escape-route chaining, `make demo`, dbt tests.
 
@@ -32,7 +32,7 @@ The frontend is a **custom hand-built HTML/CSS/JS app** (`web/`) served as stati
 ## Code conventions
 - Python 3.11+, type hints on public functions, ruff for lint/format, pytest for tests.
 - Package layout per `docs/03_ARCHITECTURE.md` §7 (`python/skillbridge/{ingest,engine,api,cards}` + static `web/`).
-- Frontend: vanilla ES modules in `web/app.js`, CSS custom properties from `05_DESIGN.md` in `web/styles.css`, semantic HTML in `web/index.html`. Plotly.js vendored or pinned; Inter self-hosted in `web/fonts/`. No frameworks, no bundlers, no npm.
+- Frontend: edit `web/src/layout.html` (sc-if/sc-for templates) and `web/src/component.js` (logic), then `python tools/rebundle.py`. Never hand-edit `web/index.html` or `web/src/shell.html`. The app consumes only the `/data/*.json` contract built by `skillbridge/api/webdata.py`.
 - DuckDB + dbt-duckdb; marts are the API's only data dependency (served from precomputed parquet in `data/artifacts/`).
 - `flows/pipeline.py` (plain fail-fast runner) orchestrates ingest → normalize → dbt build+test → precompute → quality report.
 - Keep functions small and testable; the engine (`vectors/distance/frontier/paths/bom`) is pure (no I/O) so it can be tested on fixtures.

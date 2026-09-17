@@ -110,7 +110,24 @@ def test_root_serves_frontend():
     assert "SkillBridge" in r.text
 
 
-def test_static_assets_served():
-    for path in ("/styles.css", "/app.js"):
-        r = client.get(path)
-        assert r.status_code == 200, f"{path} must be served by the app"
+def test_data_contract_for_frontend():
+    """The single-file frontend consumes /data/*.json - both modes serve it."""
+    occs = client.get("/data/occupations.json")
+    assert occs.status_code == 200
+    assert TELLER in occs.json()
+
+    cfg = client.get("/data/config.json")
+    assert cfg.status_code == 200
+    body = cfg.json()
+    assert "bom" in body and "meta" in body
+
+    skills = client.get("/data/skills.json")
+    assert skills.status_code == 200
+
+    origin = client.get(f"/data/origins/{TELLER}.json")
+    assert origin.status_code == 200
+    bundle = origin.json()
+    assert {"origin", "transitions", "best_move", "paths"} <= set(bundle)
+
+    missing = client.get("/data/origins/99-9999.json")
+    assert missing.status_code == 404

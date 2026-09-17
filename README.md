@@ -7,7 +7,7 @@ Type your job title. SkillBridge maps every realistic career transition on a
 retraining, and lower your AI-displacement risk at the same time — then hands
 you the exact **skill checklist** for the move you pick.
 
-![The Pareto frontier for Tellers](assets/screenshots/frontier.png)
+![The 3-D frontier map for Tellers](assets/screenshots/frontier.png)
 
 > *Real result, real data: for a bank teller, the frontier's best move is Air
 > Traffic Controller (+$93,440/yr, lower AI risk, no degree required — education
@@ -32,10 +32,11 @@ multi-hop path search. SkillBridge does.
 
 | Mechanic | What you see |
 |---|---|
-| **Pareto Reskilling Frontier** | Scatter of ~300 realistic moves; the green non-dominated set is instantly visible |
-| **Skill-Gap Bill of Materials** | Click a move → ✅ already have / 🟡 upgrade / 🔴 must learn, ranked, with real O*NET levels |
+| **Pareto Reskilling Frontier** | A 3-D pillar map of ~300 realistic moves (auto-orbit, guided tour); flat-chart and list views of the same data |
+| **Skill-Gap Bill of Materials** | Click a move → a skill-plan drawer: must-learn / upgrade / already-have with real O*NET levels, copy-for-resume, date-planned milestones |
 | **Escape Routes** | Beam-searched 2–3 hop ladders: `Tellers → Administrative Services Managers → IT Managers (+$122,700)` |
-| **Honest AI-risk triangulation** | Three sources (AIOE · OpenAI · Microsoft) always shown side by side, with a disagreement flag |
+| **Honest AI-risk triangulation** | Three sources (AIOE · OpenAI · Microsoft) as a range bar + per-source rows, with a disagreement flag |
+| **Priority sliders** | Pay / speed / AI-safety weights re-rank the recommendation — the frontier itself never changes |
 | **Escape-plan share card** | One click → a 1200×630 PNG rendered server-side |
 
 ![Skill-gap bill of materials](assets/screenshots/bom_drawer.png)
@@ -52,7 +53,7 @@ multi-hop path search. SkillBridge does.
         ↓
    FastAPI — serves precomputed answers (<50ms) + the static frontend
         ↓
-   Hand-built HTML/CSS/JS + vendored Plotly.js (no framework, no build step)
+   Single-file UI (embedded React runtime + Geist, no npm/build step) on the /data JSON contract
 ```
 
 Key decisions, briefly:
@@ -116,7 +117,7 @@ O*NET descriptor space, free-text job input via embeddings.
 | `docs/` | Project profile, plan, roadmap, architecture, datasets, design brief |
 | `python/skillbridge/` | `ingest/` · `engine/` (pure, unit-tested) · `api/` · `cards/` · `quality.py` |
 | `dbt/` | dbt-duckdb project: staging → core → marts + 50 tests |
-| `web/` | Hand-built frontend (tokens in `styles.css` per `docs/05_DESIGN.md`) |
+| `web/` | Single-file frontend (`index.html`); editable sources in `web/src/` + `tools/rebundle.py` |
 | `flows/pipeline.py` | Fail-fast pipeline runner (`make build`) |
 | `.github/workflows/` | CI (lint + tests) and the Pages deploy (pipeline → static export → publish) |
 | `data/sample/` | Synthetic CI fixture (labeled) |

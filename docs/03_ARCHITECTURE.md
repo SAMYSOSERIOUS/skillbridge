@@ -119,18 +119,29 @@ mart_metro_wages           (from_soc, to_soc, area_code, wage_delta_metro)
 - Beam search (beam 20, max 3 hops) maximizing `cumulative_wage_delta − λ·cumulative_skill_gap − μ·final_exposure`; return top 5 distinct paths.
 - Precompute for all origins → parquet; API is a lookup.
 
-## 5. Frontend spec (v1 — custom HTML/CSS/JS)
+## 5. Frontend spec (v3 — single-file app on the /data contract)
 
-Design contract: **`docs/05_DESIGN.md`** (dark canvas, single green accent, typography, motion). Structure: `web/index.html`, `web/styles.css`, `web/app.js`; Plotly.js is the only runtime library. No framework, no bundler, no build step — FastAPI serves the folder as-is. Every number on screen comes from an API response (rule: zero in-browser math beyond formatting).
+The UI is the adopted stakeholder design (docs/05_DESIGN.md §11), one
+self-contained `web/index.html` (React runtime + Geist fonts embedded; sources
+in `web/src/`, rebuilt by `tools/rebundle.py`; no npm, no build step).
 
-- **View 1 — Search (the hero):** headline + big centered input with autocomplete (`GET /occupations?q=`); "Try: Bank Teller" chip for the zero-friction demo.
-- **View 2 — Frontier:** Plotly.js scatter (x = skill gap, y = wage delta, color = AI-exposure delta, glowing green markers = Pareto). Hover card: title, wage, exposure bars. Animated entry (points fade in, frontier polyline draws last — this is the GIF).
-- **Drawer — BOM:** slides in on target click; three sections (✅ transferable / 🟡 upgrade / 🔴 acquire), each skill with a gap bar; "top 3 to learn first" pinned; the "+$X/yr" figure rendered large per the design brief.
-- **View — Escape routes:** horizontal stepper `A → B → C` with per-hop wage/gap/exposure chips.
-- **View — Metro map (deferred to v1.1):** needs the OEWS metro files (direct bls.gov download); the local edition ships national wages only, per the scope-cut rule in 01_PLAN.md.
-- **Share card:** button calls `GET /card/{from}/{to}`; the PNG is rendered **server-side** (Pillow/plotly export) so the download is pixel-identical everywhere.
-- **States:** every view has designed loading, empty, and error states (see `05_DESIGN.md`); API errors surface as friendly copy ("We couldn't match that job title — try a broader one"), never raw JSON.
-- **Static edition (the free live demo):** `python -m skillbridge.export_static` writes `site/` — the same frontend plus every precomputed answer as JSON (occupations, per-origin transitions/best-move/paths, the skill matrix). A GitHub Actions workflow runs the pipeline and publishes it to GitHub Pages on every push, so hosting costs nothing and never sleeps. Documented deviation from the browser-does-no-math rule: with no server available, the BOM tier split and the share-card PNG are rendered client-side from the precomputed skill levels; every underlying number is still pipeline-computed. The FastAPI product remains authoritative.
+**Data contract:** the app consumes only `./data/*.json` —
+`occupations.json`, `config.json`, `skills.json`, `origins/{soc}.json` —
+built by `skillbridge/api/webdata.py`. The same builders serve two hosts:
+
+- GitHub Pages: `skillbridge.export_static` writes them as files (plus the app)
+- FastAPI: serves them live under `/data/` in `make app` AND `make demo`
+  (sample fixture), so the identical UI runs everywhere
+
+**Rule-4 deviation (documented):** the browser performs presentation-level
+selection and assembly only — the priority sliders re-rank precomputed
+frontier moves, BOM tiers derive from precomputed O*NET levels, and target
+details are joined from occupations.json. Wages, gaps, exposure percentiles,
+frontier flags and routes are never computed client-side. The classic REST
+endpoints (`/api/*`, incl. the share-card PNG) remain for API consumers and
+are contract-tested.
+
+Feature-by-feature wiring and honest substitutions: docs/07_UI_GAP_ANALYSIS.md.
 
 ## 6. Testing strategy (what reviewers will check)
 

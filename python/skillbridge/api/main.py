@@ -12,7 +12,8 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from skillbridge.api import store
+from skillbridge.api import store, webdata
+from skillbridge.api.scoring import pick_best_moves
 from skillbridge.config import load_config
 from skillbridge.engine import core
 
@@ -22,28 +23,6 @@ WEB_DIR = REPO_ROOT / "web"
 NOT_FOUND_MSG = "We couldn't match that occupation. Try a broader job title."
 
 app = FastAPI(title="SkillBridge API", version="1.0.0")
-
-
-def _score(t: dict, origin_wage: float) -> float:
-    """Balanced ranking score - same shape as the path score (config docs)."""
-    cfg = load_config()["paths"]
-    return (
-        t["wage_delta"] / max(origin_wage, 1.0)
-        - cfg["lambda_gap"] * t["skill_gap"]
-        - cfg["mu_exposure"] * max(t["exposure_delta"], 0.0)
-    )
-
-
-def pick_best_moves(trans: list[dict], origin_wage: float) -> tuple[dict | None, dict | None]:
-    """The two panel picks: biggest win (best score) and closest win
-    (least retraining) among frontier moves with a pay gain. The pair tells
-    the whole story - the moonshot and the next step."""
-    positive_pareto = [t for t in trans if t["pareto"] and t["wage_delta"] > 0]
-    best = max(positive_pareto, key=lambda t: _score(t, origin_wage), default=None)
-    closest = min(positive_pareto, key=lambda t: t["skill_gap"], default=None)
-    if closest is best:
-        closest = None
-    return best, closest
 
 
 @app.get("/api/health")
@@ -219,6 +198,29 @@ def card(from_soc: str, to_soc: str) -> Response:
             "Content-Disposition": (f'attachment; filename="skillbridge_{from_soc}_{to_soc}.png"')
         },
     )
+
+
+@app.get("/data/occupations.json")
+def data_occupations() -> dict:
+    return webdata.build_occupations(store.load())
+
+
+@app.get("/data/config.json")
+def data_config() -> dict:
+    return webdata.build_config(store.load())
+
+
+@app.get("/data/skills.json")
+def data_skills() -> dict:
+    return webdata.build_skills(store.load())
+
+
+@app.get("/data/origins/{soc}.json")
+def data_origin(soc: str) -> dict:
+    bundle = webdata.build_origin(store.load(), soc)
+    if bundle is None:
+        raise HTTPException(status_code=404, detail=NOT_FOUND_MSG)
+    return bundle
 
 
 @app.get("/")
