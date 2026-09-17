@@ -1,6 +1,6 @@
 # Data quality report
 
-Generated 2026-09-17T17:00:48+00:00 by `python -m skillbridge.quality`. Nothing in the pipeline is dropped silently; every filter is counted here.
+Generated 2026-09-17T17:26:59+00:00 by `python -m skillbridge.quality`. Nothing in the pipeline is dropped silently; every filter is counted here.
 
 ## Sources ingested (pinned commits, checksummed)
 

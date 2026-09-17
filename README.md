@@ -1,3 +1,14 @@
+---
+title: SkillBridge AI
+emoji: 🧭
+colorFrom: green
+colorTo: gray
+sdk: docker
+app_port: 8000
+pinned: false
+short_description: Career moves ranked by pay, retraining effort, AI risk
+---
+
 # SkillBridge AI
 
 **Find realistic career moves with higher pay, smaller skill gaps, and lower AI exposure.**
@@ -15,7 +26,9 @@ you the exact **skill checklist** for the move you pick.
 > the frontier: they pay a little more but carry* ***more*** *AI exposure than
 > the teller job itself. That insight is the product.*
 
-<!-- M4: pinned 30-second demo video + live demo link go here -->
+**Live demo:** https://huggingface.co/spaces/YOUR-HF-USERNAME/skillbridge *(fill in after the Space is created)*
+
+<!-- M4: pinned 30-second demo video goes here -->
 
 ## Why this exists
 
