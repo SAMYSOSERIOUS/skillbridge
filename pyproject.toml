@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skillbridge"
+version = "0.1.0"
+description = "SkillBridge AI - the AI-era career navigation engine (Pareto Reskilling Frontier)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "ruff>=0.4",
+]
+# M1+ layers, installed when the data foundation work starts:
+data = [
+    "duckdb>=1.0",
+    "dbt-duckdb>=1.8",
+    "prefect>=2.19",
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

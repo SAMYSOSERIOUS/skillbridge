@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillBridge — where should your career go next?</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <span class="wordmark">SKILLBRIDGE</span>
+      <nav class="nav">
+        <a href="#" aria-disabled="true">Methodology</a>
+        <a href="#" aria-disabled="true">Data</a>
+        <a href="#" aria-disabled="true">About</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="hero">
+        <h1>Where should your career go next?</h1>
+        <p class="subtitle">Real moves, ranked by pay gain, retraining effort, and AI risk.</p>
+        <form class="search" id="search-form" autocomplete="off">
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Enter your current job title"
+            aria-label="Your current job title"
+          >
+          <button type="submit" class="btn-primary">Find my moves</button>
+        </form>
+        <button type="button" class="chip" id="try-demo">Try: Bank Teller</button>
+        <p class="error" id="search-error" hidden></p>
+      </section>
+
+      <section class="results" id="results" hidden>
+        <div class="grid">
+          <div class="panel chart-panel">
+            <p class="panel-label">Your Pareto frontier</p>
+            <div
+              id="frontier-chart"
+              role="img"
+              aria-label="Scatter chart of career moves; green points are the frontier."
+            ></div>
+          </div>
+          <aside class="rail">
+            <div class="panel best-move" id="best-move"></div>
+            <div class="panel exposure-panel" id="exposure-panel"></div>
+          </aside>
+        </div>
+        <p class="note" id="synthetic-note" hidden>
+          Demo mode — synthetic fixture data. Real O*NET / BLS / AI-exposure data lands in Phase 1.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        This product uses the O*NET 31.0 Database by the U.S. Department of Labor,
+        Employment and Training Administration (USDOL/ETA), used under the CC BY 4.0 license.
+        Wage data: U.S. Bureau of Labor Statistics, OEWS. AI-exposure indices:
+        Felten, Raj &amp; Seamans (AIOE); Eloundou et al. (OpenAI, MIT license);
+        Tomlinson et al. (Microsoft Research, CC BY 4.0).
+        SkillBridge is not endorsed by any of these organizations.
+      </p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

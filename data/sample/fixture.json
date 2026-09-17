@@ -1,0 +1,145 @@
+{
+  "synthetic": true,
+  "note": "Hand-built fixture. Every number is invented. See data/sample/README.md.",
+  "occupations": [
+    {
+      "soc_code": "43-3071",
+      "title": "Tellers",
+      "display_title": "Bank Teller",
+      "wage_median": 38000,
+      "exposure": {
+        "aioe": 0.82,
+        "openai": 0.78,
+        "msft": 0.71,
+        "composite": 0.77,
+        "agreement": true
+      }
+    },
+    {
+      "soc_code": "13-2072",
+      "title": "Loan Officers",
+      "display_title": "Loan Officer",
+      "wage_median": 59400,
+      "exposure": {
+        "aioe": 0.66,
+        "openai": 0.61,
+        "msft": 0.58,
+        "composite": 0.62,
+        "agreement": true
+      }
+    },
+    {
+      "soc_code": "13-1041",
+      "title": "Compliance Officers",
+      "display_title": "Compliance Analyst",
+      "wage_median": 71800,
+      "exposure": {
+        "aioe": 0.55,
+        "openai": 0.52,
+        "msft": 0.49,
+        "composite": 0.52,
+        "agreement": true
+      }
+    },
+    {
+      "soc_code": "13-2061",
+      "title": "Financial Examiners",
+      "display_title": "Financial Examiner",
+      "wage_median": 84200,
+      "exposure": {
+        "aioe": 0.50,
+        "openai": 0.47,
+        "msft": 0.44,
+        "composite": 0.47,
+        "agreement": true
+      }
+    },
+    {
+      "soc_code": "41-2011",
+      "title": "Cashiers",
+      "display_title": "Cashier",
+      "wage_median": 29700,
+      "exposure": {
+        "aioe": 0.74,
+        "openai": 0.85,
+        "msft": 0.40,
+        "composite": 0.66,
+        "agreement": false
+      }
+    }
+  ],
+  "transitions": {
+    "43-3071": [
+      {
+        "to_soc": "13-2072",
+        "to_title": "Loan Officer",
+        "skill_gap": 0.31,
+        "wage_delta": 21400,
+        "exposure_delta": -0.15,
+        "pareto": true,
+        "feasible": true
+      },
+      {
+        "to_soc": "13-1041",
+        "to_title": "Compliance Analyst",
+        "skill_gap": 0.47,
+        "wage_delta": 33800,
+        "exposure_delta": -0.25,
+        "pareto": true,
+        "feasible": true
+      },
+      {
+        "to_soc": "13-2061",
+        "to_title": "Financial Examiner",
+        "skill_gap": 0.63,
+        "wage_delta": 46200,
+        "exposure_delta": -0.30,
+        "pareto": true,
+        "feasible": false
+      },
+      {
+        "to_soc": "41-2011",
+        "to_title": "Cashier",
+        "skill_gap": 0.12,
+        "wage_delta": -8300,
+        "exposure_delta": -0.11,
+        "pareto": false,
+        "feasible": true
+      }
+    ]
+  },
+  "bom": {
+    "43-3071:13-2072": {
+      "from_title": "Bank Teller",
+      "to_title": "Loan Officer",
+      "wage_delta": 21400,
+      "exposure_delta": -0.15,
+      "transferable": [
+        {"skill": "Customer service", "origin_level": 4.2, "target_level": 4.0},
+        {"skill": "Mathematics", "origin_level": 3.5, "target_level": 3.4},
+        {"skill": "Attention to detail", "origin_level": 4.0, "target_level": 3.8}
+      ],
+      "upgrade": [
+        {"skill": "Judgment and decision making", "origin_level": 2.8, "target_level": 3.9, "gap": 1.1}
+      ],
+      "acquire": [
+        {"skill": "Credit analysis", "origin_level": 0.0, "target_level": 3.6, "gap": 3.6},
+        {"skill": "Lending regulations", "origin_level": 0.0, "target_level": 3.2, "gap": 3.2}
+      ]
+    }
+  },
+  "paths": {
+    "43-3071": [
+      {
+        "hops": [
+          {"soc": "43-3071", "title": "Bank Teller", "wage": 38000},
+          {"soc": "13-2072", "title": "Loan Officer", "wage": 59400},
+          {"soc": "13-1041", "title": "Compliance Analyst", "wage": 71800}
+        ],
+        "cumulative_wage_delta": 33800,
+        "cumulative_skill_gap": 0.55,
+        "final_exposure": 0.52
+      }
+    ]
+  }
+}

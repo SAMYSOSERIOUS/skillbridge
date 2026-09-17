@@ -1,0 +1,20 @@
+# SkillBridge tunables — single source of truth (CLAUDE.md hard rule 5).
+# Documented defaults from docs/03_ARCHITECTURE.md §4.
+
+skill_gap:
+  alpha: 0.4        # weight of cosine distance term
+  beta: 0.6         # weight of positive descriptor-deficit term
+
+frontier:
+  feasibility_tau_percentile: 65   # skill_gap <= this pct of all gaps from origin
+
+exposure:
+  agreement_max_spread: 0.25       # max-min pct rank <= this => sources agree
+
+paths:
+  beam_width: 20
+  max_hops: 3
+  lambda_gap: 1.0     # penalty on cumulative skill gap
+  mu_exposure: 1.0    # penalty on final AI exposure
+  min_wage_delta_pct: -5   # edges require wage_delta > -5%
+  top_k: 5
