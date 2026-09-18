@@ -23,6 +23,12 @@ paths:
   mu_exposure: 1.0       # penalty on final AI-exposure percentile (0..1)
   min_wage_delta_pct: -5 # an edge requires wage_delta > -5% of the hop origin's wage
   top_k: 5
+  # Route-realism gate: every route hop must be either in O*NET's own
+  # Related Occupations for the hop origin (real expert adjacency data)
+  # or within the origin's closest gap quantile. Stops the biggest-paycheck
+  # occupation from headlining every ladder via a superficially similar hop.
+  relatedness_gate: true
+  close_gap_quantile: 0.10
 
 bom:
   relevant_importance_min: 0.30   # skill counts in the BOM when target importance >= this

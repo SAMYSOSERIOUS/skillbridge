@@ -133,6 +133,17 @@ def main() -> int:
     edges: dict[int, list[tuple[int, float, float]]] = {}
     min_wage_pct = cfg["paths"]["min_wage_delta_pct"] / 100.0
 
+    # Route-realism gate (config paths.relatedness_gate): O*NET's own
+    # Related Occupations, expert adjacency judgments, as index pairs.
+    rel_pairs: set[tuple[int, int]] = set()
+    for a, bsoc in related.itertuples(index=False):
+        ia, ib = soc_index.get(a), soc_index.get(bsoc)
+        if ia is not None and ib is not None:
+            rel_pairs.add((ia, ib))
+    gate_on = bool(cfg["paths"].get("relatedness_gate", False))
+    close_q = float(cfg["paths"].get("close_gap_quantile", 0.10))
+    route_edges_kept = route_edges_gated = 0
+
     for o in range(n):
         g = gaps[o].copy()
         g[o] = np.inf
@@ -157,11 +168,20 @@ def main() -> int:
                 pareto2d_set.add(t)
                 best_wage = wage_delta[o, t]
 
-        edges[o] = [
-            (int(t), float(g[t]), float(wage_delta[o, t]))
-            for t in idx
-            if wage_delta[o, t] > min_wage_pct * wages[o]
-        ]
+        # A route hop must be honestly plausible, not just feasible: either
+        # O*NET itself lists the target as a related occupation, or the
+        # target is among this origin's very closest skill matches.
+        close_thresh = float(np.quantile(g[idx], close_q)) if len(idx) else np.inf
+        edge_list = []
+        for t in idx:
+            if wage_delta[o, t] <= min_wage_pct * wages[o]:
+                continue
+            if gate_on and (o, int(t)) not in rel_pairs and g[t] > close_thresh:
+                route_edges_gated += 1
+                continue
+            route_edges_kept += 1
+            edge_list.append((int(t), float(g[t]), float(wage_delta[o, t])))
+        edges[o] = edge_list
 
         for t in idx:
             rows.append(
@@ -203,6 +223,7 @@ def main() -> int:
                             "soc_code": serve["soc_code"][i],
                             "title": serve["title"][i],
                             "wage_median": float(wages[i]),
+                            "wage_is_floor": bool(serve["wage_is_floor"][i]),
                             "exposure_composite": round(float(exposure[i]), 3),
                         }
                         for i in path["nodes"]
@@ -263,6 +284,8 @@ def main() -> int:
         "precompute_seconds": round(time.time() - t0, 1),
         "related_validation_top_quartile": related_validation,
         "related_pairs_checked": int(total),
+        "route_edges_kept": int(route_edges_kept),
+        "route_edges_gated_out": int(route_edges_gated),
     }
     (ART_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     print(

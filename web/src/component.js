@@ -96,7 +96,7 @@ class Component extends DCLogic {
         employment:tgt.employment||0,zone:z}; });
     const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,floor:!!ox.wage_is_floor,zone:Math.round(ox.job_zone||0),
       n:b.transitions.length,rng:this.rng(ox.exposure),srcs:this.srcPcts(ox.exposure),moves,
-      routes:(b.paths||[]).map(r=>({hops:r.hops.map(hp=>hp.title),gain:r.cumulative_wage_delta,time:(r.hops.length-1)+(r.hops.length===2?' step':' steps')}))};
+      routes:(b.paths||[]).map(r=>({hops:r.hops.map(hp=>hp.title),gain:r.cumulative_wage_delta,floor:!!(r.hops[r.hops.length-1]||{}).wage_is_floor,time:(r.hops.length-1)+(r.hops.length===2?' step':' steps')}))};
     this._oKey=b; this._oCache=o; return o; }
   renderVals(){
     const h=React.createElement, S=this.state, accent=this.props.accent??'#ff7a59';
@@ -276,7 +276,7 @@ Explain in plain language whether this move makes sense for me, sketch a realist
       srcRows:o?o.srcs.map(s=>({name:s[0],pct:this.ord(Math.round(s[1]*100))})):[],
       spreadNote:o?(spread>=25?`A ${spread}-point spread means the evidence is mixed — weigh moves that narrow it.`:`A ${spread}-point spread — the three sources broadly agree here.`):'',
       altRows,
-      routes:o?o.routes.map(r=>({gain:`${this.fmt(r.gain)}/yr · ${r.time}`,hops:r.hops.map((t,i)=>({title:t,arrowStyle:i<r.hops.length-1?'color:#6f7a74':'display:none',style:hopStyle(i,r.hops.length)}))})):[],
+      routes:o?o.routes.map(r=>({gain:`${r.floor?'≥':''}${this.fmt(r.gain)}/yr · ${r.time}`,hops:r.hops.map((t,i)=>({title:t,arrowStyle:i<r.hops.length-1?'color:#6f7a74':'display:none',style:hopStyle(i,r.hops.length)}))})):[],
       hasCompare:cmpItems.length>0,compareCount:`${cmpItems.length} of 3 moves`,compareItems:cmpItems,clearCompare:()=>this.setState({compare:[]}),
       drawerOpen:!!(dm&&dt),drawer,closeDrawer:()=>this.setState({drawer:null}),copyLabel:S.copied?'✓ Copied':'Copy skills for my resume',
       heroGlobe,frontierScene,flatChart,summitScene,skillStack

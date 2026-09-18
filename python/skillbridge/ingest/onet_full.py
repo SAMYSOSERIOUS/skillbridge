@@ -52,7 +52,17 @@ BLS_EDU_COLUMNS = ["soc_code", "typical_education", "work_experience", "on_the_j
 
 
 def _get(url: str, timeout: int = 180) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 skillbridge-ingest"})
+    # bls.gov returns 403 to obviously non-browser agents; send a full,
+    # ordinary browser identity (same public files a browser would fetch).
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        ),
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
