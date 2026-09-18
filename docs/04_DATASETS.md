@@ -20,8 +20,15 @@ are real; nothing is synthesized outside `data/sample/`.
 | `msft` | `ai_applicability_scores.csv` | microsoft/working-with-ai (CC BY 4.0) | exposure channel 3 |
 
 In addition, `skillbridge.ingest.onet_full` downloads the **full O*NET text
-database** directly from onetcenter.org (version cascade 31.1 → 29.2; first
-version that downloads wins, recorded in `data/raw/onet_full/VERSION`):
+database** directly from onetcenter.org (version cascade 31.1 → 29.2). A
+release is accepted only if **every required table parses from it**; the
+first release that does is pinned in `data/raw/onet_full/VERSION`.
+**Known layout change:** release 31.0 restructured the database — `Skills.txt`
+was split into `Essential Skills.txt`/`Transferable Skills.txt` and
+`Technology Skills.txt` became `Software Skills.txt` — so the cascade
+automatically falls back to the newest classic-layout release (30.1/30.0).
+Adopting the 31.0 layout (mapping the split skills tables and Software
+Skills into the same staging models) is a documented upgrade.
 
 | table | role |
 |---|---|
