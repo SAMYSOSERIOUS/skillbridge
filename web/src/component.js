@@ -2,41 +2,32 @@
 class Component extends DCLogic {
   constructor(p){ super(p);
     const ls=(k,d)=>{ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){ return d; } };
+    this.state={step:1,query:'',origin:null,bundle:null,db:null,err:'',w:ls('sb.w',{pay:1,speed:1,safe:1}),plans:ls('sb.plans',{}),plan:null,saved:[],why:false,how:false,copied:false,showAll:false,rv:1,tilt:{x:0,y:0}};
     this.rm=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.state={ang:0,drag:null,hover:false,hoverAng:0,tourAng:0,tour:-1,query:'',origin:null,bundle:null,db:null,err:'',mode:ls('sb.view','3d'),w:ls('sb.w',{pay:1,speed:1,safe:1}),plans:ls('sb.plans',{}),drawer:null,compare:[],saved:[],why:false,copied:false};
     this._bomCache={}; this._oCache=null; this._oKey=null; }
-  componentDidMount(){ const t=()=>{ const S=this.state;
-      if(S.tour>=0&&!this.rm){ const tgt=this.tourTarget; if(tgt!=null) this.setState(s=>({tourAng:s.tourAng+(tgt-s.tourAng)*0.06})); }
-      else if(!S.drag&&!S.hover&&!this.rm&&(this.props.autoOrbit??true)) this.setState(s=>({ang:s.ang+0.25}));
-      this.raf=requestAnimationFrame(t); }; this.raf=requestAnimationFrame(t);
-    // Real data: everything below was precomputed by the pipeline
-    // (DuckDB/dbt warehouse -> engine -> JSON export). Nothing is invented here.
+  get motion(){ return !this.rm&&(this.props.motion??true); }
+  reveal(){ clearInterval(this._rf); clearTimeout(this._rt); if(!this.motion){ this.setState({rv:1}); return; } const t0=Date.now(), dur=1100;
+    this._rf=setInterval(()=>{ const p=Math.min(1,(Date.now()-t0)/dur), e=1-Math.pow(1-p,3); this.setState({rv:e}); if(p>=1) clearInterval(this._rf); },16);
+    this._rt=setTimeout(()=>{ clearInterval(this._rf); this.setState({rv:1}); },dur+80); }
+  onMove=e=>{ if(!this.motion) return; const x=e.clientX/window.innerWidth-0.5, y=e.clientY/window.innerHeight-0.5; this.setState({tilt:{x,y}}); }
+  componentWillUnmount(){ clearInterval(this._rf); clearTimeout(this._rt); window.removeEventListener('mousemove',this.onMove); }
+  componentDidMount(){ window.addEventListener('mousemove',this.onMove); this.reveal();
     const j=p=>fetch('./data/'+p).then(r=>{ if(!r.ok) throw new Error('data'); return r.json(); });
     Promise.all([j('occupations.json'),j('config.json'),j('skills.json')])
       .then(([occs,cfg,skills])=>this.setState({db:{occs,cfg,skills}}))
       .catch(()=>this.setState({err:'Could not load the dataset. Refresh to retry.'})); }
-  componentWillUnmount(){ cancelAnimationFrame(this.raf); }
   persist(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
-  seed(n){ const x=Math.sin(n*99.7)*43758.5; return x-Math.floor(x); }
   fmt(n){ return (n>=0?'+':'−')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US'); }
-  // Honest floors (Fix 3): a top-coded target wage is served as >=$208,000,
-  // so its pay delta is "at least" — shown with a >= prefix, never as exact.
   fmtPay(m){ return (m&&m.floor?'≥':'')+this.fmt(m.pay); }
-  go(id){ const el=document.getElementById(id); if(el) window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-80,behavior:this.rm?'auto':'smooth'}); }
+  goStep(n){ this.setState({step:n,rv:this.motion?0:1}); this.reveal(); try{ window.scrollTo({top:0,behavior:'auto'}); }catch(e){} }
+  lerpN(n){ return Math.round(n*this.state.rv); }
+  fmtPayRv(m){ return (m&&m.floor?'≥':'')+this.fmt(m.pay*this.state.rv); }
   loadSoc(soc){ const db=this.state.db; if(!db) return;
     fetch('./data/origins/'+soc+'.json').then(r=>{ if(!r.ok) throw new Error('x'); return r.json(); })
-      .then(bundle=>{ const title=db.occs[soc].display_title;
-        const startTour=bundle.transitions.some(t=>t.pareto&&t.wage_delta>0)&&this.state.mode==='3d'&&!this.rm;
-        this.setState({origin:soc,bundle,query:title,err:'',drawer:null,compare:[],why:false,tour:startTour?0:-1,tourAng:0});
-        setTimeout(()=>this.go('results'),60); })
+      .then(bundle=>{ this.setState({origin:soc,bundle,query:db.occs[soc].display_title,err:'',plan:null,why:false,showAll:false}); this.goStep(2); })
       .catch(()=>this.setState({err:"We couldn't analyze that occupation — it may lack wage or skill data."})); }
-  // O*NET Job Zone preparation bands (official zone definitions, not estimates)
-  zonePrep(z){ return {1:'zone 1 · little prep',2:'zone 2 · weeks–months prep',3:'zone 3 · 1–2 yrs prep',4:'zone 4 · 2–4 yrs prep',5:'zone 5 · 4+ yrs prep'}[Math.round(z)]||'prep varies'; }
+  zonePrep(z){ return {1:'Little or no preparation',2:'Weeks to months',3:'1–2 years',4:'2–4 years',5:'4+ years'}[Math.round(z)]||'Varies'; }
   zoneMonths(z){ return {1:1,2:3,3:12,4:30,5:48}[Math.round(z)]||6; }
-  // Official certification pages for widely-listed O*NET technologies.
-  // These are the vendors' own cert/credential landing pages - real,
-  // maintained here in code, never generated. Anything unmatched falls back
-  // to a multi-provider course search (Class Central, works worldwide).
   certFor(name){ const n=' '+name.toLowerCase()+' ';
     const CERTS=[
       [/tableau/, 'Tableau', 'https://www.tableau.com/learn/certification'],
@@ -62,11 +53,10 @@ class Component extends DCLogic {
       [/\bunity\b/, 'Unity', 'https://unity.com/products/unity-certifications'],
       [/servicenow/, 'ServiceNow', 'https://www.servicenow.com/services/training-and-certification.html'],
     ];
-    for(const [re,vendor,url] of CERTS){ if(re.test(n))
-      return {vendor,href:url||('https://learn.microsoft.com/en-us/credentials/browse/?terms='+encodeURIComponent(name))}; }
+    for(const [re,vendor,url] of CERTS){ if(re.test(n)) return {vendor,href:url||('https://learn.microsoft.com/en-us/credentials/browse/?terms='+encodeURIComponent(name))}; }
     return null; }
-  srcPcts(exp){ const out=[]; if(exp){ if(exp.msft!=null)out.push(['Microsoft Research (observed Copilot use)',exp.msft]);
-      if(exp.aioe!=null)out.push(['AIOE (ability-based)',exp.aioe]); if(exp.openai!=null)out.push(['OpenAI (task-based)',exp.openai]); } return out; }
+  srcPcts(exp){ const out=[]; if(exp){ if(exp.msft!=null)out.push(['Microsoft Research — observed Copilot use',exp.msft]);
+      if(exp.aioe!=null)out.push(['AIOE — ability-based',exp.aioe]); if(exp.openai!=null)out.push(['OpenAI — task-based',exp.openai]); } return out; }
   rng(exp){ const v=this.srcPcts(exp).map(x=>Math.round(x[1]*100)); return v.length?[Math.min(...v),Math.max(...v)]:[0,0]; }
   ord(n){ const v=n%100; if(v>=11&&v<=13) return n+'th'; return n+(['th','st','nd','rd'][n%10]||'th'); }
   bom(fromSoc,toSoc){ const key=fromSoc+':'+toSoc, C=this._bomCache; if(C[key]) return C[key];
@@ -80,158 +70,106 @@ class Component extends DCLogic {
     for(const k in tiers) tiers[k].sort((a,b)=>b.wg-a.wg);
     C[key]=tiers; return tiers; }
   buildOrigin(){ const S=this.state; if(!S.bundle||!S.db) return null;
-    if(this._oKey===S.bundle){ return this._oCache; }
+    if(this._oKey===S.bundle) return this._oCache;
     const db=S.db, b=S.bundle, ox=db.occs[b.origin.soc_code];
-    const gMin=Math.min(...b.transitions.map(t=>t.skill_gap));
-    const gMax=Math.max(...b.transitions.map(t=>t.skill_gap));
-    const gSpan=Math.max(0.0001,gMax-gMin);
-    const moves=b.transitions.map(t=>{ const tgt=db.occs[t.to_soc]||{}; const z=tgt.job_zone||3;
-      const edu=tgt.education||null;
-      return {id:t.to_soc,title:t.to_title,eff:(t.skill_gap-gMin)/gSpan,pay:t.wage_delta,g:t.pareto?1:0,
-        rng:this.rng(tgt.exposure),agree:!!(tgt.exposure&&tgt.exposure.agreement),
-        months:this.zoneMonths(z),time:this.zonePrep(z),
-        req:edu&&edu.typical_education?edu.typical_education:null,
-        license:edu&&edu.typical_education?edu.typical_education+' (typical entry)':'Not tracked in this build — check your state’s requirements',
-        floor:!!tgt.wage_is_floor,tech:tgt.tech||[],
-        employment:tgt.employment||0,zone:z}; });
-    const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,floor:!!ox.wage_is_floor,zone:Math.round(ox.job_zone||0),
-      n:b.transitions.length,rng:this.rng(ox.exposure),srcs:this.srcPcts(ox.exposure),moves,
+    const gMin=Math.min(...b.transitions.map(t=>t.skill_gap)), gMax=Math.max(...b.transitions.map(t=>t.skill_gap)), gSpan=Math.max(0.0001,gMax-gMin);
+    const moves=b.transitions.map(t=>{ const tgt=db.occs[t.to_soc]||{}; const z=tgt.job_zone||3; const edu=tgt.education||null;
+      return {id:t.to_soc,title:t.to_title,eff:(t.skill_gap-gMin)/gSpan,pay:t.wage_delta,g:t.pareto?1:0,rng:this.rng(tgt.exposure),agree:!!(tgt.exposure&&tgt.exposure.agreement),
+        months:this.zoneMonths(z),time:this.zonePrep(z),req:edu&&edu.typical_education?edu.typical_education:null,
+        license:edu&&edu.typical_education?edu.typical_education:'Not tracked — check your state’s rules',floor:!!tgt.wage_is_floor,tech:tgt.tech||[],employment:tgt.employment||0,zone:z}; });
+    const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,floor:!!ox.wage_is_floor,zone:Math.round(ox.job_zone||0),n:b.transitions.length,rng:this.rng(ox.exposure),srcs:this.srcPcts(ox.exposure),moves,
       routes:(b.paths||[]).map(r=>({hops:r.hops.map(hp=>hp.title),gain:r.cumulative_wage_delta,floor:!!(r.hops[r.hops.length-1]||{}).wage_is_floor,time:(r.hops.length-1)+(r.hops.length===2?' step':' steps')}))};
     this._oKey=b; this._oCache=o; return o; }
   renderVals(){
-    const h=React.createElement, S=this.state, accent=this.props.accent??'#ff7a59';
-    const db=S.db, cfgMeta=db?(db.cfg.meta||{}):{};
+    const S=this.state, db=S.db, cfgMeta=db?(db.cfg.meta||{}):{};
     const o=this.buildOrigin();
-    const frontier=o?o.moves.filter(m=>m.g):[];
-    const posFrontier=frontier.filter(m=>m.pay>0);
-    const hasMoves=posFrontier.length>0; const noMoves=!!o&&!hasMoves;
+    const frontier=o?o.moves.filter(m=>m.g):[], posFrontier=frontier.filter(m=>m.pay>0);
+    const hasMoves=posFrontier.length>0, noMoves=!!o&&!hasMoves;
     const origMid=o&&o.rng?(o.rng[0]+o.rng[1])/2:70;
-    // --- scoring with user priorities (frontier unchanged, recommendation moves) ---
     const maxPay=Math.max(1,...posFrontier.map(m=>m.pay));
     const mid=m=>(m.rng[0]+m.rng[1])/2;
     const score=m=>S.w.pay*(m.pay/maxPay)+S.w.speed*(1-m.eff)+S.w.safe*Math.max(0,Math.min(1,(origMid-mid(m))/40+0.5));
     const ranked=[...posFrontier].sort((a,b)=>score(b)-score(a));
-    const best=ranked[0]||{}, close=posFrontier.filter(m=>m.id!==best.id).sort((a,b)=>a.eff-b.eff)[0]||{};
+    const best=ranked[0]||{};
     const aiDown=m=>mid(m)<origMid;
-    const inCmp=m=>S.compare.includes(m.id);
-    const toggleCmp=m=>()=>this.setState(s=>({compare:inCmp(m)?s.compare.filter(x=>x!==m.id):s.compare.length>=3?s.compare:[...s.compare,m.id]}));
     const toggleSave=m=>()=>this.setState(s=>({saved:s.saved.includes(m.id)?s.saved.filter(x=>x!==m.id):[...s.saved,m.id]}));
-    // Field size from REAL national employment (BLS OEWS) - replaces the
-    // prototype's invented mobility-flow popularity (see docs/07_UI_GAP_ANALYSIS.md #11)
     const popTag=m=>m.employment>=200000?'Big field':m.employment>=50000?'Mid-size field':'Smaller field';
-    const popText=m=>'≈'+Math.round(m.employment).toLocaleString('en-US')+' people hold this job in the US (BLS OEWS, May 2021)';
-    const popStyle=m=>`flex:none;white-space:nowrap;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid ${m.employment>=200000?accent:'#2b332f'};color:${m.employment>=200000?accent:'#8a948e'}`;
-    const bomOf=m=>this.bom(o.soc,m.id);
-    const card=m=>m.id?({title:m.title,pay:this.fmtPay(m),time:m.time,openings:'≈'+Math.round(m.employment).toLocaleString('en-US')+' employed in the US',rangeText:`${m.rng[0]}–${m.rng[1]}th`,rLo:m.rng[0]+'%',rW:Math.max(2,m.rng[1]-m.rng[0])+'%',agreeText:(aiDown(m)?'↓ lower':'↑ higher')+' · '+(m.agree?'sources agree':'sources disagree'),agreeColor:m.agree?'#8a948e':'#e0b34a',popTag:popTag(m),popText:popText(m),popStyle:popStyle(m),open:()=>this.setState({drawer:m.id,copied:false}),compare:toggleCmp(m),compareLabel:inCmp(m)?'✓ Comparing':'+ Compare',save:toggleSave(m),saveLabel:S.saved.includes(m.id)?'★ Saved':'☆ Save'}):{};
-    const tab=on=>`background:${on?accent:'transparent'};color:${on?'#0b241a':'#8a948e'};border:none;border-radius:7px;padding:6px 12px;font:inherit;font-size:12px;font-weight:${on?500:400};cursor:pointer`;
-    const setMode=m=>()=>{ this.persist('sb.view',m); this.setState({mode:m,tour:-1}); };
-    const setW=k=>e=>{ const w={...S.w,[k]:parseFloat(e.target.value)}; this.persist('sb.w',w); this.setState({w}); };
-    const wl=v=>v===0?'ignore':v<1?'low':v===1?'normal':v<2?'high':'top';
-    // --- search over the real 714-occupation index ---
-    const servable=db?Object.values(db.occs).filter(x=>x.servable):[];
-    const allTitles=db?(this._titles||(this._titles=servable.map(x=>x.display_title).sort())):[];
-    const doSearch=q=>{ const toks=q.trim().toLowerCase().split(/\s+/).filter(Boolean); if(!toks.length) return null;
-      let bestHit=null,bestScore=0;
-      for(const x of Object.values(db.occs)){ const hay=(x.title+' '+x.display_title).toLowerCase();
-        const hits=toks.filter(t=>hay.includes(t)).length; if(!hits) continue;
-        const sc=hits*1e12+(x.servable?1e11:0)+(x.employment||0);
-        if(sc>bestScore){ bestScore=sc; bestHit=x; } }
-      return bestHit; };
+    const openings=m=>'≈'+Math.round(m.employment).toLocaleString('en-US')+' people hold this job in the US';
+    const planMove=m=>()=>{ this.setState({plan:m.id,copied:false}); this.goStep(4); };
+    const rangeText=m=>`${m.rng[0]}–${this.ord(m.rng[1])}`;
+    const agreeText=m=>(aiDown(m)?'Lower than yours today':'Higher than yours today')+' · '+(m.agree?'sources agree':'sources disagree');
+    const wl=v=>v<1?'less':v>1?'more':'normal';
+    const h=React.createElement, rv=S.rv, motion=this.motion, spd=this.props.orbitSpeed??1;
+    // 3D logo cube — six flat faces in the accent ramp
+    const face=(tf,bg)=>h('div',{style:{position:'absolute',inset:0,background:bg,transform:tf}});
+    const logoCube=h('div',{style:{width:16,height:16,perspective:120,flex:'none'}},h('div',{style:{width:16,height:16,position:'relative',transformStyle:'preserve-3d',animation:motion?`sbcube ${9/spd}s linear infinite`:'none',transform:motion?undefined:'rotateX(-20deg) rotateY(35deg)'}},
+      face('translateZ(8px)','var(--color-accent)'),face('rotateY(90deg) translateZ(8px)','var(--color-accent-600)'),face('rotateY(180deg) translateZ(8px)','var(--color-accent)'),face('rotateY(-90deg) translateZ(8px)','var(--color-accent-600)'),face('rotateX(90deg) translateZ(8px)','var(--color-accent-400)'),face('rotateX(-90deg) translateZ(8px)','var(--color-accent-800)')));
+    // Hero lattice — a tilted modular grid of moves: pillars rise with pay, one white "you" marker
+    const seed=n=>{ const x=Math.sin(n*99.7)*43758.5; return x-Math.floor(x); };
+    const cells=[]; const N=6, cs=54;
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){ const i=r*N+c, you=(r===3&&c===1), red=!you&&seed(i+7)<0.28, z=you?0:red?24+seed(i+3)*110:0;
+      cells.push(h('div',{key:i,style:{position:'absolute',left:c*cs,top:r*cs,width:cs-6,height:cs-6,transformStyle:'preserve-3d'}},
+        h('div',{style:{position:'absolute',inset:0,border:'1px solid var(--color-neutral-400)',background:you?'var(--color-text)':red?'var(--color-accent-200)':'transparent'}}),
+        red?h('div',{style:{position:'absolute',left:10,top:10,right:10,bottom:10,background:'var(--color-accent)','--z':z+'px',transform:`translateZ(${z}px)`,animation:motion?`sbbob ${5+seed(i)*4}s ease-in-out ${-seed(i+1)*6}s infinite`:'none',boxShadow:'var(--shadow-md)'}}):null,
+        you?h('div',{style:{position:'absolute',left:14,top:14,right:14,bottom:14,background:'var(--color-bg)',transform:'translateZ(2px)',animation:motion?'sbpulse 2s ease-in-out infinite':'none'}}):null)); }
+    const heroLattice=h('div',{style:{position:'absolute',inset:0,transformStyle:'preserve-3d',transform:`rotateY(${S.tilt.x*8}deg) rotateX(${-S.tilt.y*6}deg)`,transition:'transform .6s ease-out'}},
+      h('div',{style:{position:'absolute',left:'50%',top:'50%',width:N*cs,height:N*cs,marginLeft:-N*cs/2,marginTop:-N*cs/2+40,transformStyle:'preserve-3d',animation:motion?`sblat ${70/spd}s linear infinite`:'none',transform:motion?undefined:'rotateX(58deg) rotateZ(35deg)'}},...cells));
+    const bestCard=best.id?{title:best.title,pay:this.fmtPayRv(best),time:best.time,rangeText:rangeText(best),agreeText:agreeText(best),popTag:popTag(best),openings:openings(best),plan:planMove(best),
+      explain:`Of your ${o.n} realistic moves, this one best matches your priorities (pay ${wl(S.w.pay)}, speed ${wl(S.w.speed)}, AI safety ${wl(S.w.safe)}). It pays ${this.fmtPay(best)} a year more than the national median for your job, needs ${best.time.toLowerCase()} of preparation, and its AI exposure is ${aiDown(best)?'lower':'higher'} than yours today.`}:{};
+    // steps
+    const canMoves=!!o, canPlan=!!S.plan;
+    const stepDefs=[['1','Your job','What you do today'],['2','Priorities','What matters to you'],['3','Your moves','Ranked and explained'],['4','Your plan','Skills, tools, dates']];
+    const steps=stepDefs.map((d,i)=>{ const n=i+1, active=S.step===n, enabled=n===1||(n<=3&&canMoves)||(n===4&&canPlan);
+      return {n:d[0],label:d[1],sub:d[2],disabled:!enabled,go:()=>this.goStep(n),
+        style:`text-align:left;background:none;border:0;border-top:${active?'4px solid var(--color-accent)':'4px solid transparent'};margin-top:-2px;padding:18px 20px 18px 0;display:flex;flex-direction:column;gap:6px;min-width:0;font:inherit;color:inherit;cursor:${enabled?'pointer':'default'};opacity:${enabled||active?1:.4};border-right:${i<3?'2px solid var(--color-divider)':'0'};${i>0?'padding-left:20px':''}`,
+        numStyle:`color:${active?'var(--color-accent)':'inherit'}`}; });
+    // priorities
+    const setW=(k,v)=>()=>{ const w={...S.w,[k]:v}; this.persist('sb.w',w); this.setState({w}); };
+    const prio=(k,title,desc)=>{ const v=S.w[k]; return {name:'sb-'+k,title,desc,isLow:v<1,isMid:v===1,isHigh:v>1,setLow:setW(k,0.5),setMid:setW(k,1),setHigh:setW(k,1.5)}; };
+    const prios=[prio('pay','Pay gain','How much the move raises your yearly pay, using national median wages.'),prio('speed','Speed','How little you would need to retrain — moves closer to your current skills score higher.'),prio('safe','AI safety','How much the move lowers your exposure to AI, across three independent indices.')];
+    // search
+    const allTitles=db?(this._titles||(this._titles=Object.values(db.occs).filter(x=>x.servable).map(x=>x.display_title).sort())):[];
+    const doSearch=q=>{ const toks=q.trim().toLowerCase().split(/\s+/).filter(Boolean); if(!toks.length) return null; let bestHit=null,bestScore=0;
+      for(const x of Object.values(db.occs)){ const hay=(x.title+' '+x.display_title).toLowerCase(); const hits=toks.filter(t=>hay.includes(t)).length; if(!hits) continue;
+        const sc=hits*1e12+(x.servable?1e11:0)+(x.employment||0); if(sc>bestScore){ bestScore=sc; bestHit=x; } } return bestHit; };
     const submit=e=>{ e.preventDefault(); if(!db){ this.setState({err:'Still loading the dataset — one second.'}); return; }
-      const hit=doSearch(S.query);
-      if(!hit){ this.setState({err:"We couldn't match that job title — try a broader one."}); return; }
-      if(!hit.servable){ this.setState({err:`'${hit.display_title}' can't be analyzed: ${hit.excluded_reason}.`}); return; }
-      this.loadSoc(hit.soc_code); };
+      const hit=doSearch(S.query); if(!hit){ this.setState({err:"We couldn't match that job title — try a broader one."}); return; }
+      if(!hit.servable){ this.setState({err:`'${hit.display_title}' can't be analyzed: ${hit.excluded_reason}.`}); return; } this.loadSoc(hit.soc_code); };
     const demo2=cfgMeta.no_move_example||null;
-    // --- hero globe (unchanged) ---
-    const density=this.props.density??60, nodes=[];
-    for(let i=0;i<density;i++){ const g=this.seed(i+300)<0.2, th=this.seed(i)*360, ph=(this.seed(i+700)-0.5)*140;
-      nodes.push(h('div',{key:i,style:{position:'absolute',left:'50%',top:'50%',width:g?9:5,height:g?9:5,margin:g?-4.5:-2.5,borderRadius:'50%',background:g?accent:'#6f7a74',boxShadow:g?`0 0 0 4px ${accent}40`:'none',transform:`rotateY(${th}deg) rotateX(${ph}deg) translateZ(180px)`}})); }
-    const heroGlobe=h('div',{style:{position:'absolute',inset:0,transformStyle:'preserve-3d',transform:`rotateX(-12deg) rotateY(${S.ang}deg)`}},
-      h('div',{style:{position:'absolute',inset:40,border:`1px solid ${accent}30`,borderRadius:'50%',transform:'rotateX(78deg)'}}),
-      h('div',{style:{position:'absolute',inset:90,border:'1px solid #2b332f',borderRadius:'50%',transform:'rotateX(78deg)'}}),
-      h('div',{style:{position:'absolute',left:'50%',top:'50%',width:14,height:14,margin:-7,borderRadius:'50%',background:'#e8ece9',boxShadow:'0 0 30px #e8ece980'}}),...nodes);
-    // --- 3D frontier + guided tour ---
-    // Scene shows the ranked frontier (top 10 labeled) plus a stable sample of
-    // other moves; the flat chart and list always show everything.
-    const W=460,D=240;
-    const labelSet=new Set(ranked.slice(0,10).map(m=>m.id));
-    const sceneMoves=o?[...frontier,...o.moves.filter(m=>!m.g).filter((m,i)=>this.seed(i+11)<(60/Math.max(1,o.n-frontier.length)))]:[];
-    const all=sceneMoves;
-    const pos=i=>({x:(all[i].eff-0.5)*W,z:(this.seed(i+50)-0.5)*D});
-    const hMax=Math.max(1,...all.map(m=>Math.abs(m.pay)));
-    const tourOn=S.tour>=0&&hasMoves&&S.mode==='3d';
-    const tourFocus=[null,close.id,best.id][S.tour]; const focusIdx=all.findIndex(m=>m.id===tourFocus);
-    this.tourTarget=tourOn?(S.tour===0?0:(focusIdx>=0?(()=>{ const p=pos(focusIdx); return 90-Math.atan2(p.z,p.x)*180/Math.PI; })():0)):null;
-    const rot=tourOn?S.tourAng:(S.hover?S.hoverAng:S.ang*0.4);
-    const bars=all.map((p,i)=>{ const {x,z}=pos(i), hgt=Math.max(6,Math.abs(p.pay)/hMax*240), g=!!p.g, bst=p.id===best.id, foc=tourOn&&p.id===tourFocus, dim=tourOn&&!foc&&S.tour>0, lab=g&&labelSet.has(p.id);
-      return h('div',{key:p.id||('d'+i),onClick:g?()=>this.setState({drawer:p.id,copied:false}):undefined,style:{position:'absolute',left:'50%',top:'50%',width:g?14:8,height:hgt,marginLeft:g?-7:-4,marginTop:-hgt,background:bst?accent:g?`linear-gradient(180deg,${accent},${accent}80)`:'#3b453f',opacity:dim?.25:g?1:.7,borderRadius:3,transformOrigin:'bottom center',transform:`translate3d(${x}px,${z}px,0) rotateZ(${-rot}deg) rotateX(-90deg)`,boxShadow:foc?`0 0 40px ${accent}`:bst?`0 0 28px ${accent}`:g?`0 0 14px ${accent}55`:'none',cursor:g?'pointer':'default',transition:'opacity .4s,height .5s'}},
-        lab?h('div',{style:{position:'absolute',top:-20,left:'50%',transform:'translateX(-50%)',whiteSpace:'nowrap',fontSize:11,color:bst?'#0b241a':'#e8ece9',background:bst?accent:'#181d1bcc',padding:'1px 6px',borderRadius:4,fontWeight:bst?500:400}},(bst?'★ ':'')+p.title):null); });
-    const youDim=tourOn&&S.tour>0;
-    const frontierScene=h('div',{onMouseEnter:()=>{ if(!tourOn) this.setState({hover:true,hoverAng:rot}); },onMouseLeave:()=>this.setState({hover:false,drag:null}),onMouseDown:e=>{ if(!tourOn) this.setState({hover:true,drag:{x:e.clientX,a:rot}}); },onMouseMove:e=>{ if(S.drag) this.setState({hoverAng:S.drag.a+(e.clientX-S.drag.x)*0.5}); },onMouseUp:()=>this.setState({drag:null}),style:{position:'absolute',inset:0,transformStyle:'preserve-3d',cursor:tourOn?'default':'grab'}},
-      h('div',{style:{position:'absolute',left:'54%',top:'56%',width:0,height:0,transformStyle:'preserve-3d',transform:`rotateX(62deg) rotateZ(${rot}deg)`}},
-        h('div',{style:{position:'absolute',left:-W/2-40,top:-D/2-40,width:W+80,height:D+80,background:'repeating-linear-gradient(90deg,#232826 0 1px,transparent 1px 40px),repeating-linear-gradient(0deg,#232826 0 1px,transparent 1px 40px)',border:'1px solid #2b332f',borderRadius:6}}),
-        h('div',{style:{position:'absolute',left:-W/2-40,top:-D/2-40,width:W+80,height:D+80,background:`radial-gradient(circle at 30% 50%,${accent}14,transparent 60%)`}}),
-        h('div',{style:{position:'absolute',left:-W/2-8,top:-8,width:16,height:16,borderRadius:'50%',background:'#e8ece9',boxShadow:'0 0 24px #fff',opacity:youDim?.35:1,animation:this.rm?'none':'sbpulse 1.8s ease-out infinite'}}),
-        h('div',{style:{position:'absolute',left:-W/2,top:0,width:0,height:0,transformStyle:'preserve-3d',transform:`rotateZ(${-rot}deg) rotateX(-90deg)`}},h('div',{style:{position:'absolute',left:0,bottom:14,transform:'translateX(-50%)',fontSize:11,color:'#e8ece9',background:'#181d1bcc',padding:'1px 6px',borderRadius:4,opacity:youDim?.35:1,whiteSpace:'nowrap'}},'You today')),...bars));
-    const tourSteps=[
-      {t:'This is you today',x:`${o?o.title:''} · median $${o&&o.wage?Math.round(o.wage).toLocaleString('en-US'):''}/yr in the US. Every pillar is a realistic move; height is pay change, distance is how much you'd retrain.`},
-      {t:`Closest win: ${close.title||''}`,x:`${close.id?this.fmtPay(close):''}/yr with the least retraining (${close.time||''}). Fast, but check the AI-exposure range on its card.`},
-      {t:`Recommended: ${best.title||''}`,x:`${best.id?this.fmtPay(best):''}/yr, ${best.time||''}, AI exposure ${best.id?best.rng[0]+'–'+best.rng[1]+'th':''}. Adjust the sliders above if your priorities differ.`}];
-    const endTour=()=>this.setState(s=>({tour:-1,ang:s.tourAng/0.4}));
-    // --- flat chart: ALL moves ---
-    const flatAll=o?o.moves:[]; const payAbs=Math.max(1,...flatAll.map(m=>Math.abs(m.pay)));
-    const flatChart=h('div',{style:{position:'absolute',inset:'16px 8px 8px 44px',borderLeft:'1px solid #2b332f',borderBottom:'1px solid #2b332f'}},
-      h('div',{style:{position:'absolute',left:0,right:0,top:'60%',borderTop:'1px dashed #2b332f'}}),
-      h('span',{style:{position:'absolute',left:-40,top:'58%',fontSize:11,color:'#6f7a74'}},'$0'),
-      ...flatAll.map((p,i)=>{ const g=!!p.g, bst=p.id===best.id, lab=g&&labelSet.has(p.id); return h('div',{key:p.id||i,onClick:g?()=>this.setState({drawer:p.id,copied:false}):undefined,style:{position:'absolute',left:`${Math.min(98,p.eff*96)}%`,top:`${60-p.pay/payAbs*55}%`,width:g?12:7,height:g?12:7,margin:g?-6:-3.5,borderRadius:'50%',background:g?accent:'#3b453f',boxShadow:bst?`0 0 0 6px ${accent}55`:g?`0 0 0 5px ${accent}33`:'none',cursor:g?'pointer':'default'}},lab?h('span',{style:{position:'absolute',left:16,top:-4,fontSize:11,whiteSpace:'nowrap',color:'#e8ece9'}},(bst?'★ ':'')+p.title):null); }));
-    // --- summit (no-better-move state) ---
-    const summitScene=h('div',{style:{position:'absolute',inset:0,transformStyle:'preserve-3d',transform:'translateY(60px)'}},h('div',{style:{position:'absolute',inset:0,transformStyle:'preserve-3d',transform:`rotateX(68deg) rotateZ(${S.ang*0.4}deg)`}},
-      ...[0,1,2,3,4].map(i=>h('div',{key:i,style:{position:'absolute',left:'50%',top:'50%',width:260-i*52,height:260-i*52,margin:-(130-i*26),borderRadius:'50%',border:`1px solid ${i===4?accent:'#2b332f'}`,background:i===4?`${accent}22`:'transparent',transform:`translateZ(${i*22}px)`}})),
-      h('div',{style:{position:'absolute',left:'50%',top:'50%',width:16,height:16,margin:-8,borderRadius:'50%',background:'#e8ece9',boxShadow:'0 0 30px #fff',transform:'translateZ(100px)',animation:this.rm?'none':'sbpulse 1.8s ease-out infinite'}})));
-    // --- alternatives (real, from the same precomputed transitions) ---
-    const altRows=[];
-    if(o){ const feas=o.moves;
+    // chart
+    const all=o?o.moves:[]; const payAbs=Math.max(1,...all.map(m=>Math.abs(m.pay)));
+    const zero=62;
+    const points=all.map((p,i)=>{ const g=!!p.g, bst=p.id===best.id, sz=g?14:9;
+      return {title:p.title,tip:`${p.title} · ${this.fmtPay(p)}/yr · ${p.time}`,plan:planMove(p),labelled:bst,
+        style:`position:absolute;left:calc(${Math.min(97,4+p.eff*92)}% - ${sz/2}px);top:calc(${zero-p.pay*rv/payAbs*(zero-6)}% - ${sz/2}px);width:${sz}px;height:${sz}px;padding:0;border:${bst?'2px solid var(--color-text)':'0'};box-sizing:border-box;background:${g?'var(--color-accent)':'var(--color-neutral-400)'};cursor:pointer;z-index:${bst?3:g?2:1};animation:${motion?`sbpop .5s cubic-bezier(.22,1,.36,1) ${.3+i*.05}s backwards${bst?', sbring 2.2s ease-out 1.2s infinite':''}`:'none'}`,
+        labelStyle:`position:absolute;${p.eff>0.5?'right:20px;text-align:right':'left:20px'};top:-4px;font-size:12px;font-weight:600;white-space:nowrap;width:max-content;max-width:260px;overflow:hidden;text-overflow:ellipsis;color:var(--color-text);background:var(--color-bg);padding:1px 6px`}; });
+    // table rows
+    const tableMoves=S.showAll?[...ranked,...all.filter(m=>!posFrontier.includes(m)).sort((a,b)=>b.pay-a.pay)]:ranked;
+    const rows=tableMoves.map((m,i)=>({rowStyle:motion?`animation:sbin .5s cubic-bezier(.22,1,.36,1) ${.4+Math.min(i,10)*.06}s backwards`:'',title:m.title,isBest:m.id===best.id,pay:this.fmtPay(m),payColor:m.pay>=0?'var(--color-text)':'var(--color-neutral-600)',time:m.time,rangeText:rangeText(m),dir:aiDown(m)?'↓ lower':'↑ higher',popTag:popTag(m),plan:planMove(m),
+      dot:`width:10px;height:10px;flex:none;background:${m.g?'var(--color-accent)':'var(--color-neutral-400)'}`}));
+    // alternatives
+    const altRows=[]; if(o){ const feas=o.moves;
       const safer=feas.filter(m=>mid(m)<origMid-5&&m.pay>=-(o.wage||1)*0.05).sort((a,b)=>mid(a)-mid(b))[0];
-      if(safer) altRows.push({label:'Lower AI exposure, similar or better pay',title:safer.title,note:`−${Math.round(origMid-mid(safer))} pts AI →`});
+      if(safer) altRows.push({label:'Lower AI exposure, similar or better pay',title:safer.title,note:`−${Math.round(origMid-mid(safer))} pts AI exposure`});
       const nearest=feas.filter(m=>m.pay>=0&&(!safer||m.id!==safer.id)).sort((a,b)=>a.eff-b.eff)[0];
-      if(nearest) altRows.push({label:'Adjacent role, least retraining',title:nearest.title,note:nearest.time+' →'});
+      if(nearest) altRows.push({label:'Adjacent role, least retraining',title:nearest.title,note:nearest.time});
       if(!altRows.length) altRows.push({label:'No lower-exposure alternative clears the bar',title:'Your current role holds up well in this data',note:''}); }
-    // --- drawer ---
-    const sc=0.7, layer=(z,col,label,n)=>h('div',{style:{position:'absolute',left:'50%',top:'50%',width:300*sc,height:100*sc,marginLeft:-150*sc,marginTop:-50*sc,transform:`rotateX(58deg) rotateZ(-30deg) translateZ(${z*sc}px)`,background:'#181d1b',border:`1px solid ${col}`,borderRadius:8,boxShadow:`0 0 24px ${col}33`}},h('span',{style:{position:'absolute',left:10,top:8,fontSize:12,color:col,fontWeight:500,whiteSpace:'nowrap'}},label),h('span',{style:{position:'absolute',right:10,bottom:8,fontSize:22,color:'#e8ece9',fontWeight:500}},n));
-    const dm=frontier.find(m=>m.id===S.drawer)||(o?o.moves.find(m=>m.id===S.drawer):null);
-    const dt=dm?bomOf(dm):null;
-    const skillStack=dm&&dt?h('div',{style:{position:'absolute',inset:0,transformStyle:'preserve-3d',animation:this.rm?'none':'sbfloat 6s ease-in-out infinite'}},layer(0,'#4a5a52','You already have',String(dt.have.length)),layer(50,'#e0b34a','Needs upgrading',String(dt.upgrade.length)),layer(100,'#e05a4a','Must learn',String(dt.acquire.length))):null;
+    // plan
+    const dm=o?o.moves.find(m=>m.id===S.plan):null; const dt=dm?this.bom(o.soc,dm.id):null;
     let drawer={};
-    if(dm&&dt){
-      const plan=S.plans[dm.id]||{}; const now=new Date();
-      const ym=(mo)=>{ const d=new Date(now.getFullYear(),now.getMonth()+Math.round(mo),1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+    if(dm&&dt){ const plan=S.plans[dm.id]||{}; const now=new Date();
+      const ym=mo=>{ const d=new Date(now.getFullYear(),now.getMonth()+Math.round(mo),1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
       const wgMax=Math.max(0.0001,...dt.acquire.map(a=>a.wg));
-      const acquire=dt.acquire.map(a=>({skill:a.skill,levels:a.o+' → '+a.t,how:`Search courses: “${a.skill}”`,w:Math.round(a.wg/wgMax*100)+'%'}));
+      const acquire=dt.acquire.map(a=>({skill:a.skill,levels:a.o+' → '+a.t,href:'https://www.classcentral.com/search?q='+encodeURIComponent(a.skill),w:Math.round(a.wg/wgMax*100)+'%'}));
       const haveNames=dt.have.map(x=>x.skill), upgradeNames=dt.upgrade.map(x=>x.skill);
-      const items=[...dt.acquire.map((a,i)=>({k:'a'+i,title:'Learn '+a.skill+' (search courses to find one that fits)',mo:dm.months*(i+1)/(dt.acquire.length+1)})),
+      const items=[...dt.acquire.map((a,i)=>({k:'a'+i,title:'Learn '+a.skill,mo:dm.months*(i+1)/(dt.acquire.length+1)})),
         ...(upgradeNames.length?[{k:'up',title:'Upgrade '+upgradeNames.slice(0,2).join(' & ')+(upgradeNames.length>2?' +'+(upgradeNames.length-2):'')+' on the job',mo:dm.months*0.8}]:[]),
-        {k:'lic',title:'Check your state’s license/certification rules for '+dm.title,mo:dm.months*0.9},
-        {k:'apply',title:'Apply for '+dm.title+' roles',mo:dm.months}];
+        {k:'lic',title:'Check your state’s license or certification rules for '+dm.title,mo:dm.months*0.9},{k:'apply',title:'Apply for '+dm.title+' roles',mo:dm.months}];
       const savePlan=p=>{ const plans={...S.plans,[dm.id]:p}; this.persist('sb.plans',plans); this.setState({plans}); };
-      const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,date:st.date||ym(it.mo),style:`${done?'color:#6f7a74;text-decoration:line-through':''}`,toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
+      const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,date:st.date||ym(it.mo),style:done?'color:var(--color-neutral-600);text-decoration:line-through':'',toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
       const doneN=milestones.filter(m=>m.done).length;
-      const mailBody=`My SkillBridge escape plan%0A${o.title} → ${dm.title}%0APay: ${this.fmtPay(dm)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
-      // Real tools & certification pointers (O*NET Technology Skills).
-      // One clean action per tool: the vendor's OFFICIAL certification page
-      // when we know it (curated map in certFor - real pages, never
-      // generated), otherwise one multi-provider course search that works
-      // worldwide. Never an invented certification (hard rule 1).
-      // (CareerOneStop was dropped: it geo-blocks visitors outside the US.)
-      const techRows=(dm.tech||[]).slice(0,6).map(t=>{ const cert=this.certFor(t.name);
-        return {name:t.name,
-          hotDot:t.hot?`display:inline-block;width:6px;height:6px;border-radius:50%;background:${accent};margin-right:8px;vertical-align:2px`:'display:none',
-          hotTitle:t.hot?'frequently required in job postings':'',
-          linkLabel:cert?`${cert.vendor} certification →`:'Find courses →',
-          linkStyle:cert?`flex:none;font-size:12px;font-weight:500;color:${accent};text-decoration:none;white-space:nowrap`:'flex:none;font-size:12px;color:#8a948e;text-decoration:none;white-space:nowrap',
-          href:cert?cert.href:'https://www.classcentral.com/search?q='+encodeURIComponent(t.name)}; });
-      // "Where is the AI?" - an evidence-fed explainer. The prompt carries ONLY
-      // facts the pipeline computed; it explicitly tells Claude not to invent numbers.
+      const mailBody=`My SkillBridge plan%0A${o.title} → ${dm.title}%0APay: ${this.fmtPay(dm)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
+      const techRows=(dm.tech||[]).slice(0,6).map(t=>{ const cert=this.certFor(t.name); return {name:t.name,hotDot:t.hot?'display:inline-block;width:8px;height:8px;background:var(--color-accent);flex:none':'display:inline-block;width:8px;height:8px;flex:none',linkLabel:cert?`${cert.vendor} certification →`:'Find courses →',href:cert?cert.href:'https://www.classcentral.com/search?q='+encodeURIComponent(t.name)}; });
       const claudePrompt=`I'm exploring a career move with SkillBridge AI, which computes everything from real public data (O*NET, BLS OEWS, three AI-exposure indices). Reason only from these computed facts plus general career knowledge, and do not invent statistics:
 - Current job: ${o.title}, US median ${o.floor?'at least ':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr, education zone ${o.zone} of 5.
 - Target: ${dm.title}, pay change ${this.fmtPay(dm)}/yr (national medians${dm.floor?'; the target median is top-coded, so this is a floor':''}), preparation ${dm.time}.
@@ -239,47 +177,46 @@ class Component extends DCLogic {
 - Skills to learn from scratch: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}.
 - Skills to upgrade on the job: ${upgradeNames.join(', ')||'none'}.
 - Real tools/software O*NET lists for the target: ${(dm.tech||[]).slice(0,8).map(t=>t.name).join(', ')||'none listed'}.
-Explain in plain language whether this move makes sense for me, sketch a realistic month-by-month plan built on those exact skills and tools (including which certifications are worth searching for), and finish with what this data cannot tell me.`;
-      const claudeHref='https://claude.ai/new?q='+encodeURIComponent(claudePrompt);
-      drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmtPay(dm),techRows,hasTech:techRows.length>0,claudeHref,aiShort:(aiDown(dm)?'AI ↓':'AI ↑')+' · '+(dm.agree?'sources agree':'sources disagree'),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${dt.acquire.length+dt.upgrade.length+dt.have.length}`,license:dm.license,acquireCount:dt.acquire.length+' skills',acquire,upgradeCount:dt.upgrade.length+' skills',upgrade:upgradeNames,have:haveNames.length?'Already at target level: '+haveNames.join(', ')+'.':'No skills at target level yet — the checklist below is the whole path.',milestones,planDone:`${doneN} of ${milestones.length} done`,mailto:`mailto:?subject=${encodeURIComponent('My career escape plan: '+dm.title)}&body=${mailBody}`,copySkills:()=>{ const txt=haveNames.concat(upgradeNames).join(', '); if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); this.setState({copied:true}); setTimeout(()=>this.setState({copied:false}),1800); },save:toggleSave(dm),saveLabel:S.saved.includes(dm.id)?'★ Saved':'Save plan',compare:toggleCmp(dm)};
-    }
-    const cmpItems=S.compare.map(id=>o?o.moves.find(m=>m.id===id):null).filter(Boolean).map(m=>({title:m.title,pay:this.fmtPay(m),time:m.time,ai:aiDown(m)?'AI ↓':'AI ↑'}));
-    const hopStyle=(i,n)=>`white-space:nowrap;background:#181d1b;border:1px solid ${i===0?'#2b332f':i===n-1?accent:'#232826'};border-radius:999px;padding:5px 12px;color:${i===0?'#8a948e':'#e8ece9'}`;
-    const bomBest=best.id?bomOf(best):null;
+Explain in plain language whether this move makes sense for me, sketch a realistic month-by-month plan built on those exact skills and tools, and finish with what this data cannot tell me.`;
+      const total=dt.acquire.length+dt.upgrade.length+dt.have.length;
+      drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmtPayRv(dm),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${total}`,license:dm.license,
+        intro:`Here is what the O*NET skill profiles say separates your job from this one. Of ${total} skills that matter for ${dm.title}, you already hold ${dt.have.length} at the required level, ${dt.upgrade.length} need strengthening, and ${dt.acquire.length} must be learned from scratch.`,
+        acquireIntro:dt.acquire.length?`Start here — these are the biggest gaps. The bar shows how much each one matters for the target job. Levels are O*NET's 0–100 scale: yours today → what the job needs.`:'Nothing to learn from scratch — every key skill is already in your profile at some level.',
+        acquire,upgradeIntro:upgradeNames.length?'You already have these, just not yet at the level the job asks for. Most people close these gaps through practice and stretch assignments rather than courses.':'Nothing to upgrade — your existing skills are either already at level or need learning from scratch.',
+        upgrade:upgradeNames,have:haveNames.length?'Already at the target level: '+haveNames.join(', ')+'.':'No skills at the target level yet — the lists above are the whole path.',
+        techRows,hasTech:techRows.length>0,milestones,planDone:`${doneN} of ${milestones.length} done`,
+        mailto:`mailto:?subject=${encodeURIComponent('My career plan: '+dm.title)}&body=${mailBody}`,claudeHref:'https://claude.ai/new?q='+encodeURIComponent(claudePrompt),
+        copySkills:()=>{ const txt=haveNames.concat(upgradeNames).join(', '); if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); this.setState({copied:true}); setTimeout(()=>this.setState({copied:false}),1800); },
+        save:toggleSave(dm),saveLabel:S.saved.includes(dm.id)?'Saved ✓':'Save this plan'}; }
+    const hopStyle=(i,n)=>`white-space:nowrap;border:1px solid ${i===n-1?'var(--color-accent)':'var(--color-divider)'};padding:6px 12px;color:${i===0?'var(--color-neutral-700)':'var(--color-text)'};font-size:13px`;
+    const bomBest=best.id?this.bom(o.soc,best.id):null;
     const whyLines=best.id&&bomBest?[
-      {k:this.fmtPay(best),v:`pay gain (national median) — ${Math.round(best.pay/maxPay*100)}% of the largest gain on your frontier`},
-      {k:'Effort '+best.eff.toFixed(2),v:`you already hold ${bomBest.have.length} of ${bomBest.have.length+bomBest.upgrade.length+bomBest.acquire.length} key skills at level; ${bomBest.acquire.length} must be learned from scratch`},
-      {k:`${best.rng[0]}–${best.rng[1]}th`,v:`AI exposure after the move vs your ${o.rng[0]}–${o.rng[1]}th today — ${best.agree?'all sources agree on the direction':'sources disagree on the direction'}`},
-      {k:popTag(best),v:popText(best)},
-      {k:'Your weights',v:`pay ${wl(S.w.pay)} · speed ${wl(S.w.speed)} · AI safety ${wl(S.w.safe)} — change the sliders and this recommendation re-ranks`}]:[];
+      {k:this.fmtPay(best)+'/yr',v:`Pay gain on national medians — ${Math.round(best.pay/maxPay*100)}% of the largest gain among your best trade-offs.`},
+      {k:`${bomBest.have.length} of ${bomBest.have.length+bomBest.upgrade.length+bomBest.acquire.length} skills`,v:`You already hold these at the required level; ${bomBest.acquire.length} must be learned from scratch.`},
+      {k:rangeText(best)+' percentile',v:`AI exposure after the move vs your ${o.rng[0]}–${o.rng[1]}th today — ${best.agree?'all three sources agree on the direction':'the sources disagree on the direction'}.`},
+      {k:popTag(best),v:openings(best)+' (BLS OEWS). This is how many hold the job, not how often people switch into it.'}]:[];
     const spread=o?o.rng[1]-o.rng[0]:0;
     return {
-      accent,query:S.query,onType:e=>this.setState({query:e.target.value,err:''}),
-      submit,
-      demoTeller:()=>{ if(db){ this.setState({query:'Bank Teller'}); this.loadSoc('43-3071'); } },
-      demoSurgeon:()=>{ if(db&&demo2) this.loadSoc(demo2.soc); },
-      demo2Label:demo2?`Try: ${demo2.title} (no better move)`:'',hasDemo2:!!demo2,
-      allTitles,hasErr:!!S.err,err:S.err,
-      dataUpdated:(cfgMeta.built_at||'').slice(0,10)||'—',
-      hasResults:!!o,hasMoves,noMoves,
-      originLine:o?`YOU TODAY · ${o.title.toUpperCase()} · ${o.floor?'≥':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr US MEDIAN · EDUCATION ZONE ${o.zone} OF 5`:'',
-      verdict:hasMoves?`Your best realistic move is ${best.title} — ${this.fmtPay(best)}/yr, ${aiDown(best)?'lower':'higher'} AI risk, preparation ${best.time}.`:noMoves?"No single move beats what you have — you're already at the top of your frontier.":'',
-      verdictSub:o?((hasMoves?`Based on ${o.n} real moves scored on pay, effort and AI risk, weighted by your priorities. Every move is either O*NET-related to your job or among your closest skill matches`:`Of ${o.n} realistic moves, none improves pay without a large retraining cost. That's a good position, not a dead end`)+(o.floor?'. Your own median wage is a government floor (≥$208k), so pay changes shown are upper bounds':'')):'',
-      whyOpen:S.why,toggleWhy:()=>this.setState(s=>({why:!s.why})),whyLabel:S.why?'Hide the reasoning':'Why this move?',whyLines,
-      wPay:S.w.pay,wSpeed:S.w.speed,wSafe:S.w.safe,setWPay:setW('pay'),setWSpeed:setW('speed'),setWSafe:setW('safe'),wPayLabel:wl(S.w.pay),wSpeedLabel:wl(S.w.speed),wSafeLabel:wl(S.w.safe),
-      is3d:S.mode==='3d',isFlat:S.mode==='flat',isList:S.mode==='list',set3d:setMode('3d'),setFlat:setMode('flat'),setList:setMode('list'),tab3d:tab(S.mode==='3d'),tabFlat:tab(S.mode==='flat'),tabList:tab(S.mode==='list'),
-      mapHint:tourOn?'Guided tour · '+(S.tour+1)+' of 3':this.rm?'Static view (reduced motion)':S.hover?'⏸ orbit paused · drag to rotate':`▶ auto-orbit · top ${Math.min(10,posFrontier.length)} labeled · flat chart shows all ${o?o.n:0}`,
-      tourOn,tourNum:String(S.tour+1),tourTitle:tourOn?tourSteps[S.tour].t:'',tourText:tourOn?tourSteps[S.tour].x:'',tourNextLabel:S.tour===2?'Explore the map':'Next',tourNext:()=>{ if(S.tour>=2) endTour(); else this.setState(s=>({tour:s.tour+1})); },tourSkip:endTour,
-      moves:ranked.map(m=>({title:m.title,meta:`${m.time} · effort ${m.eff.toFixed(2)} · ${popTag(m)}`,pay:this.fmtPay(m),ai:`AI ${m.rng[0]}–${m.rng[1]}th`,open:()=>this.setState({drawer:m.id,copied:false})})),
-      best:card(best),close:card(close),origMidPct:origMid+'%',origRange:o?`${o.rng[0]}–${o.rng[1]}th`:'',
-      origLo:o?o.rng[0]+'%':'0%',origW:o?Math.max(2,o.rng[1]-o.rng[0])+'%':'0%',
+      steps,isStep1:S.step===1,isStep2:S.step===2&&!!o,isStep3:S.step===3&&!!o,isStep4:S.step===4&&!!(dm&&dt),
+      toStep1:()=>this.goStep(1),toStep2:()=>this.goStep(2),toStep3:()=>this.goStep(3),restart:e=>{ e.preventDefault(); this.goStep(1); },
+      query:S.query,onType:e=>this.setState({query:e.target.value,err:''}),submit,
+      demoTeller:()=>{ if(db){ this.setState({query:'Bank Teller'}); this.loadSoc('43-3071'); } },demoSurgeon:()=>{ if(db&&demo2) this.loadSoc(demo2.soc); },
+      demo2Label:demo2?`${demo2.title} (no better move)`:'',hasDemo2:!!demo2,allTitles,hasErr:!!S.err,err:S.err,dataUpdated:(cfgMeta.built_at||'').slice(0,10)||'—',
+      logoCube,heroLattice,
+      originTitle:o?o.title:'',originWage:o?`${o.floor?'≥':''}$${this.lerpN(o.wage).toLocaleString('en-US')}`:'',originZone:o?String(o.zone):'',originN:o?String(o.n):'',
+      origRange:o?`${this.lerpN(o.rng[0])}–${this.ord(this.lerpN(o.rng[1]))}`:'',origLo:o?o.rng[0]+'%':'0%',origW:o?Math.max(2,o.rng[1]-o.rng[0])+'%':'0%',
       srcRows:o?o.srcs.map(s=>({name:s[0],pct:this.ord(Math.round(s[1]*100))})):[],
-      spreadNote:o?(spread>=25?`A ${spread}-point spread means the evidence is mixed — weigh moves that narrow it.`:`A ${spread}-point spread — the three sources broadly agree here.`):'',
-      altRows,
-      routes:o?o.routes.map(r=>({gain:`${r.floor?'≥':''}${this.fmt(r.gain)}/yr · ${r.time}`,hops:r.hops.map((t,i)=>({title:t,arrowStyle:i<r.hops.length-1?'color:#6f7a74':'display:none',style:hopStyle(i,r.hops.length)}))})):[],
-      hasCompare:cmpItems.length>0,compareCount:`${cmpItems.length} of 3 moves`,compareItems:cmpItems,clearCompare:()=>this.setState({compare:[]}),
-      drawerOpen:!!(dm&&dt),drawer,closeDrawer:()=>this.setState({drawer:null}),copyLabel:S.copied?'✓ Copied':'Copy skills for my resume',
-      heroGlobe,frontierScene,flatChart,summitScene,skillStack
+      spreadNote:o?(spread>=25?`A ${spread}-point spread means the evidence is mixed — favour moves that narrow it.`:`A ${spread}-point spread — the three sources broadly agree here.`):'',
+      prios,hasMoves,noMoves,
+      verdict:hasMoves?`Your best realistic move is ${best.title}.`:noMoves?"No single move beats what you have.":'',
+      verdictSub:o?((hasMoves?`We scored ${o.n} realistic moves on pay, retraining effort and AI risk, then ranked the best trade-offs by your priorities. Below: the recommendation explained, every move at a glance, and the full list.`:`Of ${o.n} realistic moves, none improves pay without a large retraining cost.`)+(o.floor?' Your own median wage is a government floor (≥$208k), so pay changes shown are upper bounds.':'')):'',
+      best:bestCard,whyOpen:S.why,toggleWhy:()=>this.setState(s=>({why:!s.why})),whyLabel:S.why?'Hide the reasoning':'Why this move?',whyLines,
+      points,zeroTop:zero+'%',rows,tableTitle:S.showAll?`All ${all.length} realistic moves`:`Your ${ranked.length} best trade-offs, ranked`,
+      tableSub:S.showAll?'Grey squares are realistic but beaten by another move on every count. Sorted by pay after the ranked trade-offs.':'Ranked by your priorities. Every one is either O*NET-related to your job or among your closest skill matches.',
+      toggleAll:()=>this.setState(s=>({showAll:!s.showAll})),toggleAllLabel:S.showAll?'Show best trade-offs only':`Show all ${all.length} moves`,
+      hasRoutes:!!(o&&o.routes.length),routes:o?o.routes.map(r=>({gain:`${r.floor?'≥':''}${this.fmt(r.gain)}/yr · ${r.time}`,hops:r.hops.map((t,i)=>({title:t,arrowStyle:i<r.hops.length-1?'color:var(--color-neutral-600)':'display:none',style:hopStyle(i,r.hops.length)}))})):[],
+      altRows,howOpen:S.how,toggleHow:()=>this.setState(s=>({how:!s.how})),howLabel:S.how?'Hide how we scored this ↑':'How we scored this ↓',
+      drawer,copyLabel:S.copied?'Copied ✓':'Copy skills for my resume'
     };
   }
 }

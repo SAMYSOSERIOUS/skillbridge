@@ -164,3 +164,36 @@ what each element shows). What changes and what holds:
 - Honesty rules carried over: three exposure sources always shown (now as a
   range bar + per-source rows + spread note), field-size tags from real
   employment, real build date, reduced-motion supported throughout.
+
+
+---
+
+## 12. v3 — Wizard layout (ADOPTED, supersedes the dark single-page design above)
+
+The stakeholder redesign "SkillBridge Wizard" is the shipped frontend as of
+2026-09-18. Same architecture (single self-contained bundle, sources in
+`web/src/`, `python tools/rebundle.py`, template payload at shell line 384),
+same `/data/*.json` contract, new look:
+
+- **Design system:** light "modernist" token set embedded in the bundle
+  (`:root` tokens: `--color-bg #f3f2f2`, `--color-text #201e1d`, accent
+  `#ec3013` + OKLCH tonal ramps, `--font-heading`). These tokens are the only
+  colors in `web/` now.
+- **Structure:** a 4-step wizard — 1 Your job (search + demo buttons +
+  data-source line), 2 Priorities (low/normal/high per pay, speed, AI
+  safety), 3 Your moves (verdict + "Why this move?", 2-D pay-vs-retraining
+  chart, ranked table with "show all" toggle, escape routes, alternatives,
+  "How we scored this" methodology fold), 4 Your plan (BOM tiers with real
+  course/cert links, typical entry requirement, dated checklist,
+  save/email/Claude explainer).
+- **Signature motion:** rotating logo cube, hero lattice with mouse-tilt
+  parallax, count-up reveal on step change; `prefers-reduced-motion` and the
+  `motion` prop disable all of it.
+- **Honesty surfaces preserved:** three exposure sources + spread note,
+  relatedness-gate wording in the table sub-line and methodology, ≥ floors
+  everywhere (incl. route endpoints and origin-floor note), attribution
+  block + US-edition note + $208k explanation in the footer, no-move summit
+  state with real alternatives.
+- Retired with this design: the 3-D orbit map/flat/list view switcher and
+  the compare tray (scope rule §28 of INSTRUCTIONS.md — the wizard's chart +
+  ranked table carry the same information with less clutter).
