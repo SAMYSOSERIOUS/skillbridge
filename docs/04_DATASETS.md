@@ -14,20 +14,48 @@ are real; nothing is synthesized outside `data/sample/`.
 | key | file | provenance | role |
 |---|---|---|---|
 | `openai` | `occ_level.csv` | openai/GPTs-are-GPTs (MIT) | LLM exposure (human beta ratings), O*NET-SOC spine |
-| `onet_skills` | `occupations_onet_basic_skills.csv` | O*NET via the MIT repo | 11 basic skills, importance + level (0-100), Job Zones |
 | `onet_tasks` | `full_onet_data.tsv` | O*NET via the MIT repo | 19k task statements (task-content similarity) |
-| `onet_match` | `occupations_onet_bls_matched.csv` | the MIT repo | occupation-name -> SOC crosswalk input |
 | `oews` | `national_May2021_dl.csv` | BLS OEWS May 2021 (US Gov) | national wages incl. suppression/top-codes |
 | `aioe` | `Language Modeling AIOE and AIIE.xlsx` | AIOE-Data/AIOE | exposure channel 1 |
 | `msft` | `ai_applicability_scores.csv` | microsoft/working-with-ai (CC BY 4.0) | exposure channel 3 |
 
-Top-code note: in the May 2021 OEWS release, `#` means an annual wage
->= $208,000; SkillBridge stores it as NULL + `wage_topcoded` flag.
+In addition, `skillbridge.ingest.onet_full` downloads the **full O*NET text
+database** directly from onetcenter.org (version cascade 31.1 → 29.2; first
+version that downloads wins, recorded in `data/raw/onet_full/VERSION`):
 
-**Documented upgrades (v1.1+):** D1's full O*NET 31.0 descriptor space
-(200+ descriptors) and D2's May 2025 OEWS metro files (the Metro
-Wage-Arbitrage map) require direct downloads from onetcenter.org /
-bls.gov and slot into the same staging models.
+| table | role |
+|---|---|
+| `Occupation Data` | official titles/descriptions; 8-digit O*NET-SOC spine |
+| `Skills`, `Knowledge`, `Abilities` | the full ~120-descriptor space (IM 1–5, LV 0–7), suppression-filtered |
+| `Job Zones` | official preparation zones (replaces the retired basic-skills file's zones) |
+| `Technology Skills` | **real named tools per occupation** (Tableau, SAS, Power BI, …) with the hot-technology flag — powers the certification pointers |
+| `Related Occupations` | O*NET's own similarity judgments — used as an engine validation metric |
+
+It also attempts the optional **BLS education/training assignments** workbook
+(Table 5.4, bls.gov); if unavailable, the pipeline degrades gracefully — an
+empty schema-correct table is written, the quality report says so, and the UI
+falls back to Job Zones. These direct downloads run in GitHub Actions and on
+developer machines; they retire the old `onet_skills` (11 basic skills) and
+`onet_match` (name-based crosswalk) sources — the crosswalk is now code-based
+(8-digit O*NET-SOC truncates to 6-digit SOC, the official 2019 convention).
+
+Top-code note: in the May 2021 OEWS release, `#` means an annual wage
+>= $208,000; SkillBridge stores the median as NULL + `wage_topcoded` flag, and
+serves an honest **floor** (`wage_serving = 208000`, `wage_is_floor = true`,
+shown as "≥" in the UI) so top-paying occupations are visible without guessing.
+
+**Certification pointers, honestly:** the app links each O*NET-listed
+technology to real *searches* — CareerOneStop's certification finder (US DOL)
+and Coursera search. SkillBridge never invents or asserts a specific
+certification.
+
+**Regional scope:** this is the **US edition** — every dataset shares the US
+O*NET-SOC/OEWS taxonomies, so all numbers are mutually consistent. An EU
+edition would swap in ESCO + Eurostat equivalents; mixing the two taxonomies
+would silently break joins, so it is planned as a separate edition, not mixed.
+
+**Documented upgrades (v1.1+):** D2's May 2025 OEWS metro files (the Metro
+Wage-Arbitrage map) slot into the same staging models.
 
 ---
 

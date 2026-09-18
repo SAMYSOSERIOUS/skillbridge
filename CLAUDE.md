@@ -21,7 +21,7 @@ The frontend is a **single self-contained file** (`web/index.html`; sources in `
 ## Hard rules
 1. **Never invent data.** All values come from the real files listed in `docs/04_DATASETS.md`. If a download fails or a schema differs from the doc, stop, report, and update the doc in the same commit as the code fix. No synthetic placeholder values outside `data/sample/` fixtures (which are clearly labeled).
 2. **No silent drops.** Filtered rows (suppressed O*NET values, suppressed OEWS cells, unmatched crosswalk codes) are counted into the auto-generated `data_quality.md`. Suppressed wages are NULL, never 0.
-3. **All joins go through `dim_soc_crosswalk`** with dbt tests asserting ≥95% coverage. Never join O*NET-SOC to OEWS codes directly.
+3. **All joins go through `dim_soc_crosswalk`** — code-based since v2 (8-digit O*NET-SOC truncates to its 6-digit SOC, the official O*NET-SOC 2019 convention), with a dbt test gating wage coverage (`min_crosswalk_coverage`). Never join O*NET-SOC to OEWS codes ad hoc in a model.
 4. **The browser talks only to the API.** Every number in the UI comes from a `fetch()` of a FastAPI endpoint backed by marts/artifacts — no in-browser math beyond formatting, no data files loaded directly by the frontend. API contract tests are load-bearing. (Static GitHub Pages edition: the same responses come from exported JSON; only the BOM tier split and share card render client-side from precomputed values — see docs/03_ARCHITECTURE.md §5.)
 5. **Tunables live in `config.yaml`** (α, β, τ, λ, μ, beam width) with documented defaults; never hardcode them.
 6. **Honest UI:** AI exposure always displays all three source bars and the agreement flag; the composite never appears alone.

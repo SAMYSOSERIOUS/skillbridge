@@ -22,10 +22,36 @@ models:
     columns:
       - name: soc_code
         tests: [not_null, unique]
-  - name: stg_onet_match
+  - name: stg_onet_occupations
     columns:
-      - name: occupation_name
-        tests: [not_null]
+      - name: onet_soc_code
+        tests: [not_null, unique]
+  - name: stg_onet_descriptors
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [onet_soc_code, domain, element_name]
+    columns:
+      - name: importance_raw
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 5
+      - name: level_raw
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 7
+  - name: stg_onet_job_zones
+    columns:
+      - name: job_zone
+        tests:
+          - dbt_utils_range_check:
+              min_value: 1
+              max_value: 5
+  - name: stg_onet_tech
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [soc_code, technology]
   - name: stg_onet_tasks
     columns:
       - name: soc_code

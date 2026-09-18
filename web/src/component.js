@@ -19,6 +19,9 @@ class Component extends DCLogic {
   persist(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
   seed(n){ const x=Math.sin(n*99.7)*43758.5; return x-Math.floor(x); }
   fmt(n){ return (n>=0?'+':'−')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US'); }
+  // Honest floors (Fix 3): a top-coded target wage is served as >=$208,000,
+  // so its pay delta is "at least" — shown with a >= prefix, never as exact.
+  fmtPay(m){ return (m&&m.floor?'≥':'')+this.fmt(m.pay); }
   go(id){ const el=document.getElementById(id); if(el) window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-80,behavior:this.rm?'auto':'smooth'}); }
   loadSoc(soc){ const db=this.state.db; if(!db) return;
     fetch('./data/origins/'+soc+'.json').then(r=>{ if(!r.ok) throw new Error('x'); return r.json(); })
@@ -51,11 +54,15 @@ class Component extends DCLogic {
     const gMax=Math.max(...b.transitions.map(t=>t.skill_gap));
     const gSpan=Math.max(0.0001,gMax-gMin);
     const moves=b.transitions.map(t=>{ const tgt=db.occs[t.to_soc]||{}; const z=tgt.job_zone||3;
+      const edu=tgt.education||null;
       return {id:t.to_soc,title:t.to_title,eff:(t.skill_gap-gMin)/gSpan,pay:t.wage_delta,g:t.pareto?1:0,
         rng:this.rng(tgt.exposure),agree:!!(tgt.exposure&&tgt.exposure.agreement),
-        months:this.zoneMonths(z),time:this.zonePrep(z),license:'Not tracked in v1 — check your state’s requirements',
+        months:this.zoneMonths(z),time:this.zonePrep(z),
+        req:edu&&edu.typical_education?edu.typical_education:null,
+        license:edu&&edu.typical_education?edu.typical_education+' (BLS typical entry)':'Not tracked in this build — check your state’s requirements',
+        floor:!!tgt.wage_is_floor,tech:tgt.tech||[],
         employment:tgt.employment||0,zone:z}; });
-    const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,zone:Math.round(ox.job_zone||0),
+    const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,floor:!!ox.wage_is_floor,zone:Math.round(ox.job_zone||0),
       n:b.transitions.length,rng:this.rng(ox.exposure),srcs:this.srcPcts(ox.exposure),moves,
       routes:(b.paths||[]).map(r=>({hops:r.hops.map(hp=>hp.title),gain:r.cumulative_wage_delta,time:(r.hops.length-1)+(r.hops.length===2?' step':' steps')}))};
     this._oKey=b; this._oCache=o; return o; }
@@ -83,7 +90,7 @@ class Component extends DCLogic {
     const popText=m=>'≈'+Math.round(m.employment).toLocaleString('en-US')+' people hold this job in the US (BLS OEWS, May 2021)';
     const popStyle=m=>`flex:none;white-space:nowrap;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid ${m.employment>=200000?accent:'#2b332f'};color:${m.employment>=200000?accent:'#8a948e'}`;
     const bomOf=m=>this.bom(o.soc,m.id);
-    const card=m=>m.id?({title:m.title,pay:this.fmt(m.pay),time:m.time,openings:'≈'+Math.round(m.employment).toLocaleString('en-US')+' employed in the US',rangeText:`${m.rng[0]}–${m.rng[1]}th`,rLo:m.rng[0]+'%',rW:Math.max(2,m.rng[1]-m.rng[0])+'%',agreeText:(aiDown(m)?'↓ lower':'↑ higher')+' · '+(m.agree?'sources agree':'sources disagree'),agreeColor:m.agree?'#8a948e':'#e0b34a',popTag:popTag(m),popText:popText(m),popStyle:popStyle(m),open:()=>this.setState({drawer:m.id,copied:false}),compare:toggleCmp(m),compareLabel:inCmp(m)?'✓ Comparing':'+ Compare',save:toggleSave(m),saveLabel:S.saved.includes(m.id)?'★ Saved':'☆ Save'}):{};
+    const card=m=>m.id?({title:m.title,pay:this.fmtPay(m),time:m.time,openings:'≈'+Math.round(m.employment).toLocaleString('en-US')+' employed in the US',rangeText:`${m.rng[0]}–${m.rng[1]}th`,rLo:m.rng[0]+'%',rW:Math.max(2,m.rng[1]-m.rng[0])+'%',agreeText:(aiDown(m)?'↓ lower':'↑ higher')+' · '+(m.agree?'sources agree':'sources disagree'),agreeColor:m.agree?'#8a948e':'#e0b34a',popTag:popTag(m),popText:popText(m),popStyle:popStyle(m),open:()=>this.setState({drawer:m.id,copied:false}),compare:toggleCmp(m),compareLabel:inCmp(m)?'✓ Comparing':'+ Compare',save:toggleSave(m),saveLabel:S.saved.includes(m.id)?'★ Saved':'☆ Save'}):{};
     const tab=on=>`background:${on?accent:'transparent'};color:${on?'#0b241a':'#8a948e'};border:none;border-radius:7px;padding:6px 12px;font:inherit;font-size:12px;font-weight:${on?500:400};cursor:pointer`;
     const setMode=m=>()=>{ this.persist('sb.view',m); this.setState({mode:m,tour:-1}); };
     const setW=k=>e=>{ const w={...S.w,[k]:parseFloat(e.target.value)}; this.persist('sb.w',w); this.setState({w}); };
@@ -137,8 +144,8 @@ class Component extends DCLogic {
         h('div',{style:{position:'absolute',left:-W/2,top:0,width:0,height:0,transformStyle:'preserve-3d',transform:`rotateZ(${-rot}deg) rotateX(-90deg)`}},h('div',{style:{position:'absolute',left:0,bottom:14,transform:'translateX(-50%)',fontSize:11,color:'#e8ece9',background:'#181d1bcc',padding:'1px 6px',borderRadius:4,opacity:youDim?.35:1,whiteSpace:'nowrap'}},'You today')),...bars));
     const tourSteps=[
       {t:'This is you today',x:`${o?o.title:''} · median $${o&&o.wage?Math.round(o.wage).toLocaleString('en-US'):''}/yr in the US. Every pillar is a realistic move; height is pay change, distance is how much you'd retrain.`},
-      {t:`Closest win: ${close.title||''}`,x:`${close.id?this.fmt(close.pay):''}/yr with the least retraining (${close.time||''}). Fast, but check the AI-exposure range on its card.`},
-      {t:`Recommended: ${best.title||''}`,x:`${best.id?this.fmt(best.pay):''}/yr, ${best.time||''}, AI exposure ${best.id?best.rng[0]+'–'+best.rng[1]+'th':''}. Adjust the sliders above if your priorities differ.`}];
+      {t:`Closest win: ${close.title||''}`,x:`${close.id?this.fmtPay(close):''}/yr with the least retraining (${close.time||''}). Fast, but check the AI-exposure range on its card.`},
+      {t:`Recommended: ${best.title||''}`,x:`${best.id?this.fmtPay(best):''}/yr, ${best.time||''}, AI exposure ${best.id?best.rng[0]+'–'+best.rng[1]+'th':''}. Adjust the sliders above if your priorities differ.`}];
     const endTour=()=>this.setState(s=>({tour:-1,ang:s.tourAng/0.4}));
     // --- flat chart: ALL moves ---
     const flatAll=o?o.moves:[]; const payAbs=Math.max(1,...flatAll.map(m=>Math.abs(m.pay)));
@@ -177,14 +184,32 @@ class Component extends DCLogic {
       const savePlan=p=>{ const plans={...S.plans,[dm.id]:p}; this.persist('sb.plans',plans); this.setState({plans}); };
       const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,date:st.date||ym(it.mo),style:`${done?'color:#6f7a74;text-decoration:line-through':''}`,toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
       const doneN=milestones.filter(m=>m.done).length;
-      const mailBody=`My SkillBridge escape plan%0A${o.title} → ${dm.title}%0APay: ${this.fmt(dm.pay)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
-      drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmt(dm.pay),aiShort:(aiDown(dm)?'AI ↓':'AI ↑')+' · '+(dm.agree?'sources agree':'sources disagree'),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${dt.acquire.length+dt.upgrade.length+dt.have.length}`,license:dm.license,acquireCount:dt.acquire.length+' skills',acquire,upgradeCount:dt.upgrade.length+' skills',upgrade:upgradeNames,have:haveNames.length?'Already at target level: '+haveNames.join(', ')+'.':'No skills at target level yet — the checklist below is the whole path.',milestones,planDone:`${doneN} of ${milestones.length} done`,mailto:`mailto:?subject=${encodeURIComponent('My career escape plan: '+dm.title)}&body=${mailBody}`,copySkills:()=>{ const txt=haveNames.concat(upgradeNames).join(', '); if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); this.setState({copied:true}); setTimeout(()=>this.setState({copied:false}),1800); },save:toggleSave(dm),saveLabel:S.saved.includes(dm.id)?'★ Saved':'Save plan',compare:toggleCmp(dm)};
+      const mailBody=`My SkillBridge escape plan%0A${o.title} → ${dm.title}%0APay: ${this.fmtPay(dm)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
+      // Real tools & certification pointers (O*NET Technology Skills). The
+      // links are real SEARCHES on CareerOneStop and Coursera for the named
+      // tool - SkillBridge never invents a certification (hard rule 1).
+      const techRows=(dm.tech||[]).slice(0,8).map(t=>({name:t.name,
+        hotStyle:t.hot?`flex:none;color:${accent};border:1px solid ${accent}66;border-radius:999px;padding:0 6px;font-size:10px`:'display:none',
+        cos:'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx?keyword='+encodeURIComponent(t.name),
+        coursera:'https://www.coursera.org/search?query='+encodeURIComponent(t.name+' certification')}));
+      // "Where is the AI?" - an evidence-fed explainer. The prompt carries ONLY
+      // facts the pipeline computed; it explicitly tells Claude not to invent numbers.
+      const claudePrompt=`I'm exploring a career move with SkillBridge AI, which computes everything from real public data (O*NET, BLS OEWS, three AI-exposure indices). Reason only from these computed facts plus general career knowledge, and do not invent statistics:
+- Current job: ${o.title}, US median ${o.floor?'at least ':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr, education zone ${o.zone} of 5.
+- Target: ${dm.title}, pay change ${this.fmtPay(dm)}/yr (national medians${dm.floor?'; the target median is top-coded, so this is a floor':''}), preparation ${dm.time}.
+- ${dm.req?'Typical entry education (BLS): '+dm.req+'. ':''}AI-exposure percentiles: me ${o.rng[0]}-${o.rng[1]}th today, target ${dm.rng[0]}-${dm.rng[1]}th (${dm.agree?'sources agree':'sources disagree'}).
+- Skills to learn from scratch: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}.
+- Skills to upgrade on the job: ${upgradeNames.join(', ')||'none'}.
+- Real tools/software O*NET lists for the target: ${(dm.tech||[]).slice(0,8).map(t=>t.name).join(', ')||'none listed'}.
+Explain in plain language whether this move makes sense for me, sketch a realistic month-by-month plan built on those exact skills and tools (including which certifications are worth searching for), and finish with what this data cannot tell me.`;
+      const claudeHref='https://claude.ai/new?q='+encodeURIComponent(claudePrompt);
+      drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmtPay(dm),techRows,hasTech:techRows.length>0,claudeHref,aiShort:(aiDown(dm)?'AI ↓':'AI ↑')+' · '+(dm.agree?'sources agree':'sources disagree'),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${dt.acquire.length+dt.upgrade.length+dt.have.length}`,license:dm.license,acquireCount:dt.acquire.length+' skills',acquire,upgradeCount:dt.upgrade.length+' skills',upgrade:upgradeNames,have:haveNames.length?'Already at target level: '+haveNames.join(', ')+'.':'No skills at target level yet — the checklist below is the whole path.',milestones,planDone:`${doneN} of ${milestones.length} done`,mailto:`mailto:?subject=${encodeURIComponent('My career escape plan: '+dm.title)}&body=${mailBody}`,copySkills:()=>{ const txt=haveNames.concat(upgradeNames).join(', '); if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); this.setState({copied:true}); setTimeout(()=>this.setState({copied:false}),1800); },save:toggleSave(dm),saveLabel:S.saved.includes(dm.id)?'★ Saved':'Save plan',compare:toggleCmp(dm)};
     }
-    const cmpItems=S.compare.map(id=>o?o.moves.find(m=>m.id===id):null).filter(Boolean).map(m=>({title:m.title,pay:this.fmt(m.pay),time:m.time,ai:aiDown(m)?'AI ↓':'AI ↑'}));
+    const cmpItems=S.compare.map(id=>o?o.moves.find(m=>m.id===id):null).filter(Boolean).map(m=>({title:m.title,pay:this.fmtPay(m),time:m.time,ai:aiDown(m)?'AI ↓':'AI ↑'}));
     const hopStyle=(i,n)=>`white-space:nowrap;background:#181d1b;border:1px solid ${i===0?'#2b332f':i===n-1?accent:'#232826'};border-radius:999px;padding:5px 12px;color:${i===0?'#8a948e':'#e8ece9'}`;
     const bomBest=best.id?bomOf(best):null;
     const whyLines=best.id&&bomBest?[
-      {k:this.fmt(best.pay),v:`pay gain (national median) — ${Math.round(best.pay/maxPay*100)}% of the largest gain on your frontier`},
+      {k:this.fmtPay(best),v:`pay gain (national median) — ${Math.round(best.pay/maxPay*100)}% of the largest gain on your frontier`},
       {k:'Effort '+best.eff.toFixed(2),v:`you already hold ${bomBest.have.length} of ${bomBest.have.length+bomBest.upgrade.length+bomBest.acquire.length} key skills at level; ${bomBest.acquire.length} must be learned from scratch`},
       {k:`${best.rng[0]}–${best.rng[1]}th`,v:`AI exposure after the move vs your ${o.rng[0]}–${o.rng[1]}th today — ${best.agree?'all sources agree on the direction':'sources disagree on the direction'}`},
       {k:popTag(best),v:popText(best)},
@@ -199,15 +224,15 @@ class Component extends DCLogic {
       allTitles,hasErr:!!S.err,err:S.err,
       dataUpdated:(cfgMeta.built_at||'').slice(0,10)||'—',
       hasResults:!!o,hasMoves,noMoves,
-      originLine:o?`YOU TODAY · ${o.title.toUpperCase()} · $${Math.round(o.wage).toLocaleString('en-US')}/yr US MEDIAN · EDUCATION ZONE ${o.zone} OF 5`:'',
-      verdict:hasMoves?`Your best realistic move is ${best.title} — ${this.fmt(best.pay)}/yr, ${aiDown(best)?'lower':'higher'} AI risk, preparation ${best.time}.`:noMoves?"No single move beats what you have — you're already at the top of your frontier.":'',
+      originLine:o?`YOU TODAY · ${o.title.toUpperCase()} · ${o.floor?'≥':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr US MEDIAN · EDUCATION ZONE ${o.zone} OF 5`:'',
+      verdict:hasMoves?`Your best realistic move is ${best.title} — ${this.fmtPay(best)}/yr, ${aiDown(best)?'lower':'higher'} AI risk, preparation ${best.time}.`:noMoves?"No single move beats what you have — you're already at the top of your frontier.":'',
       verdictSub:o?(hasMoves?`Based on ${o.n} real moves scored on pay, effort and AI risk, weighted by your priorities`:`Of ${o.n} realistic moves, none improves pay without a large retraining cost. That's a good position, not a dead end`):'',
       whyOpen:S.why,toggleWhy:()=>this.setState(s=>({why:!s.why})),whyLabel:S.why?'Hide the reasoning':'Why this move?',whyLines,
       wPay:S.w.pay,wSpeed:S.w.speed,wSafe:S.w.safe,setWPay:setW('pay'),setWSpeed:setW('speed'),setWSafe:setW('safe'),wPayLabel:wl(S.w.pay),wSpeedLabel:wl(S.w.speed),wSafeLabel:wl(S.w.safe),
       is3d:S.mode==='3d',isFlat:S.mode==='flat',isList:S.mode==='list',set3d:setMode('3d'),setFlat:setMode('flat'),setList:setMode('list'),tab3d:tab(S.mode==='3d'),tabFlat:tab(S.mode==='flat'),tabList:tab(S.mode==='list'),
       mapHint:tourOn?'Guided tour · '+(S.tour+1)+' of 3':this.rm?'Static view (reduced motion)':S.hover?'⏸ orbit paused · drag to rotate':`▶ auto-orbit · top ${Math.min(10,posFrontier.length)} labeled · flat chart shows all ${o?o.n:0}`,
       tourOn,tourNum:String(S.tour+1),tourTitle:tourOn?tourSteps[S.tour].t:'',tourText:tourOn?tourSteps[S.tour].x:'',tourNextLabel:S.tour===2?'Explore the map':'Next',tourNext:()=>{ if(S.tour>=2) endTour(); else this.setState(s=>({tour:s.tour+1})); },tourSkip:endTour,
-      moves:ranked.map(m=>({title:m.title,meta:`${m.time} · effort ${m.eff.toFixed(2)} · ${popTag(m)}`,pay:this.fmt(m.pay),ai:`AI ${m.rng[0]}–${m.rng[1]}th`,open:()=>this.setState({drawer:m.id,copied:false})})),
+      moves:ranked.map(m=>({title:m.title,meta:`${m.time} · effort ${m.eff.toFixed(2)} · ${popTag(m)}`,pay:this.fmtPay(m),ai:`AI ${m.rng[0]}–${m.rng[1]}th`,open:()=>this.setState({drawer:m.id,copied:false})})),
       best:card(best),close:card(close),origMidPct:origMid+'%',origRange:o?`${o.rng[0]}–${o.rng[1]}th`:'',
       origLo:o?o.rng[0]+'%':'0%',origW:o?Math.max(2,o.rng[1]-o.rng[0])+'%':'0%',
       srcRows:o?o.srcs.map(s=>({name:s[0],pct:this.ord(Math.round(s[1]*100))})):[],

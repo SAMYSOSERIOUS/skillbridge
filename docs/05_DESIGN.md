@@ -149,7 +149,16 @@ what each element shows). What changes and what holds:
 - **Skill-plan drawer**: floating 3-layer skill stack, must-learn/upgrade/have
   tiers with real O*NET levels, copy-skills-for-resume, date-planned
   milestones (suggested from Job-Zone bands, user-editable), save / email /
-  compare. License line reads "Not tracked in v1" until a real source exists.
+  compare. The "Typical requirements" cell shows the target's real BLS
+  typical entry education when available (fallback: "Not tracked in this
+  build"). A "Real tools & certifications" section lists the target's
+  O*NET Technology Skills (hot-tech flagged, accent-bordered chip) with
+  links to real searches (CareerOneStop, Coursera) — never an invented
+  certification. An accent-outlined "Explain my plan with Claude" action
+  opens claude.ai pre-filled with only pipeline-computed facts.
+- **Wage floors:** any pay figure whose target median is top-coded carries a
+  "≥" prefix (cards, verdict, tour, drawer, compare, origin line) — the
+  floor is $208,000, shown honestly, never an estimate.
 - **Empty state ("no better move")** is a first-class scene (summit), with
   real alternatives listed when the data has them.
 - Honesty rules carried over: three exposure sources always shown (now as a

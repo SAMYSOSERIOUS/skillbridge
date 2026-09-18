@@ -17,8 +17,6 @@ RAW_DIR = REPO_ROOT / "data" / "raw"
 
 CSV_SOURCES = {
     "openai": "occ_level.csv",
-    "onet_skills": "occupations_onet_basic_skills.csv",
-    "onet_match": "occupations_onet_bls_matched.csv",
     "oews": "national_May2021_dl.csv",
     "msft": "ai_applicability_scores.csv",
 }

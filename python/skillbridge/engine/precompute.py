@@ -29,9 +29,11 @@ def load_marts() -> tuple[pd.DataFrame, pd.DataFrame]:
     con = duckdb.connect(str(DB_PATH), read_only=True)
     occ = con.execute(
         """
-        select soc_code, title, wage_median, wage_topcoded, employment,
+        select soc_code, title,
+               wage_serving as wage_median, wage_is_floor, wage_topcoded, employment,
                pct_aioe, pct_openai, pct_msft, n_sources,
-               exposure_composite, agreement_flag, has_skills, job_zone
+               exposure_composite, agreement_flag, has_skills, job_zone,
+               typical_education, work_experience, on_the_job_training
         from mart_occupations
         order by soc_code
         """
@@ -40,8 +42,13 @@ def load_marts() -> tuple[pd.DataFrame, pd.DataFrame]:
         "select soc_code, skill, importance, skill_level from mart_skill_matrix"
     ).df()
     tasks = con.execute("select soc_code, task_text from stg_onet_tasks").df()
+    tech = con.execute("select soc_code, technology, hot from mart_tech").df()
+    related = con.execute(
+        "select soc_code, related_soc_code from stg_onet_related "
+        "where tier = 'Primary-Short' or tier = 'Primary-Long' or tier like 'Primary%'"
+    ).df()
     con.close()
-    return occ, skills, tasks
+    return occ, skills, tasks, tech, related
 
 
 def task_distance_matrix(serve_socs: list[str], tasks: pd.DataFrame) -> np.ndarray:
@@ -75,7 +82,7 @@ def main() -> int:
         print("No warehouse found - run `make build` (dbt) first.")
         return 1
     cfg = load_config()
-    occ, skills_long, tasks = load_marts()
+    occ, skills_long, tasks, tech, related = load_marts()
 
     # Serving set: needs title, wage, >=2 exposure sources, and a skill vector
     serve = occ[
@@ -215,6 +222,20 @@ def main() -> int:
     skills_long[skills_long["soc_code"].isin(soc_index)].to_parquet(
         ART_DIR / "skills.parquet", index=False
     )
+    tech[tech["soc_code"].isin(soc_index)].to_parquet(ART_DIR / "tech.parquet", index=False)
+
+    # Engine sanity vs O*NET's own Related Occupations (docs 03 §4.1):
+    # for related pairs inside the serving set, the related target's gap
+    # should rank in the origin's closest quartile.
+    rel = related[related["soc_code"].isin(soc_index) & related["related_soc_code"].isin(soc_index)]
+    hits = total = 0
+    for a, bsoc in rel.itertuples(index=False):
+        i, j2 = soc_index[a], soc_index[bsoc]
+        row = gaps[i]
+        rank = float((row < row[j2]).sum()) / max(1, n - 1)
+        total += 1
+        hits += rank <= 0.25
+    related_validation = round(hits / total, 3) if total else None
     (ART_DIR / "paths.json").write_text(json.dumps(all_paths))
 
     # occupations NOT in the serving set stay searchable with an honest reason
@@ -240,6 +261,8 @@ def main() -> int:
             "exposure": "AIOE (2021) + OpenAI GPTs-are-GPTs (2023/24) + Microsoft WAI (2025)",
         },
         "precompute_seconds": round(time.time() - t0, 1),
+        "related_validation_top_quartile": related_validation,
+        "related_pairs_checked": int(total),
     }
     (ART_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     print(

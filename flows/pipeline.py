@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 STEPS: list[tuple[str, list[str]]] = [
     ("ingest", [sys.executable, "-m", "skillbridge.ingest.run"]),
+    ("ingest O*NET full db", [sys.executable, "-m", "skillbridge.ingest.onet_full"]),
     ("normalize", [sys.executable, "-m", "skillbridge.ingest.normalize"]),
     ("warehouse", ["dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt"]),
     ("precompute", [sys.executable, "-m", "skillbridge.engine.precompute"]),

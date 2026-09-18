@@ -47,9 +47,12 @@ def _load_fixture() -> dict:
             "title": o["title"],
             "display_title": o["display_title"],
             "wage_median": o["wage_median"],
+            "wage_is_floor": False,
             "wage_topcoded": False,
             "employment": None,
             "job_zone": None,
+            "education": None,
+            "tech": [],
             "exposure": o["exposure"],
             "servable": True,
             "excluded_reason": None,
@@ -79,6 +82,30 @@ def _load_real() -> dict:
     paths = json.loads((ART_DIR / "paths.json").read_text())
     meta = json.loads((ART_DIR / "meta.json").read_text())
 
+    # Real named technologies per occupation (O*NET Technology Skills),
+    # hot flags first. Absent in pre-v2 artifact sets - degrade to [].
+    tech_by_soc: dict[str, list[dict]] = {}
+    tech_path = ART_DIR / "tech.parquet"
+    if tech_path.exists():
+        for r in pd.read_parquet(tech_path).itertuples(index=False):
+            tech_by_soc.setdefault(r.soc_code, []).append(
+                {"name": r.technology, "hot": bool(r.hot)}
+            )
+
+    def _edu(r) -> dict | None:
+        te = getattr(r, "typical_education", None)
+        if te is None or pd.isna(te):
+            return None
+        return {
+            "typical_education": str(te),
+            "work_experience": None
+            if pd.isna(getattr(r, "work_experience", None))
+            else str(r.work_experience),
+            "on_the_job_training": None
+            if pd.isna(getattr(r, "on_the_job_training", None))
+            else str(r.on_the_job_training),
+        }
+
     occs: dict[str, dict] = {}
     for r in occ.itertuples(index=False):
         occs[r.soc_code] = {
@@ -86,9 +113,12 @@ def _load_real() -> dict:
             "title": r.title,
             "display_title": r.title,
             "wage_median": None if pd.isna(r.wage_median) else float(r.wage_median),
+            "wage_is_floor": bool(getattr(r, "wage_is_floor", False)),
             "wage_topcoded": bool(r.wage_topcoded),
             "employment": None if pd.isna(r.employment) else float(r.employment),
             "job_zone": None if pd.isna(r.job_zone) else round(float(r.job_zone), 1),
+            "education": _edu(r),
+            "tech": tech_by_soc.get(r.soc_code, []),
             "exposure": {
                 "aioe": None if pd.isna(r.pct_aioe) else round(float(r.pct_aioe), 3),
                 "openai": None if pd.isna(r.pct_openai) else round(float(r.pct_openai), 3),
@@ -108,9 +138,12 @@ def _load_real() -> dict:
                 "title": r.title,
                 "display_title": r.title,
                 "wage_median": None,
+                "wage_is_floor": False,
                 "wage_topcoded": False,
                 "employment": None,
                 "job_zone": None,
+                "education": None,
+                "tech": [],
                 "exposure": None,
                 "servable": False,
                 "excluded_reason": r.reason,

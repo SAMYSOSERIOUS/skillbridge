@@ -22,7 +22,7 @@ occupations**. Rule 1 (never invent data) governs every decision below.
 | 6 | AI-exposure ranges (e.g. "52–86th"), per-source bars, agreement flag, 34-point-spread note | invented ranges | real: 3 source percentiles per occupation | **WIRED** (range = min–max of real sources) |
 | 7 | Metro wage selector (NY ×1.22, DFW ×1.04, PHX ×0.97) | **invented multipliers** | national wages only (metro OEWS needs bls.gov download — deferred v1.1) | **DEFERRED** (selector shows "United States (national)"; metro view returns with the real OEWS metro file) |
 | 8 | Retraining time ("6–9 mo", plan dates from months) | **invented** | O*NET Job Zones (real) | **SUBSTITUTED**: preparation band from the target's official Job Zone definition (e.g. zone 3 = "1–2 years typical prep"); plan dates are user-editable suggestions labeled as such |
-| 9 | "License needed: NMLS / Series 65" | **invented** | no licensing dataset in v1 sources | **DEFERRED**: field reads "Not tracked in v1 — check your state's requirements"; global licensing caveat kept |
+| 9 | "License needed: NMLS / Series 65" | **invented** | BLS typical entry education (optional table) + O*NET Technology Skills | **SUBSTITUTED (v2)**: cell renamed "Typical requirements" and shows the target's real BLS typical entry education when the optional table downloaded (falls back to "Not tracked in this build"); plus a new drawer section listing the target's real O*NET-listed tools with hot-tech flags, each linked to real *searches* (CareerOneStop certification finder, Coursera) — no invented certifications, ever |
 | 10 | Openings/yr ("~31,200 openings/yr") | **invented** | real national employment per occupation (OEWS) | **SUBSTITUTED**: "≈X employed in the US (May 2021)" |
 | 11 | "Common path / Untapped" popularity (BLS CPS mobility flows, marked "illustrative") | **invented** | no mobility-flow dataset | **SUBSTITUTED**: field-size tag from real employment (Big / Mid-size / Smaller field); all mobility-flow wording removed |
 | 12 | Skill checklist drawer: must-learn (with level jumps + course line + weight bar), upgrade, already-have, copy-for-resume | fake skills | real BOM from O*NET levels | **WIRED** (course line becomes a neutral "search courses for '<skill>'" pointer — no invented courses) |
@@ -34,6 +34,9 @@ occupations**. Rule 1 (never invent data) governs every decision below.
 | 18 | "Data updated May 2026" | **invented** | real build timestamp in meta.json | **WIRED** (real build date) |
 | 19 | Search box ("Find my moves") | regex on 2 names | 714 searchable occupations | **WIRED** (+ native suggestion list and a friendly not-found message — the prototype had neither) |
 | 20 | Geist font, clay-orange accent, dark canvas | embedded woff2 | n/a | **WIRED** (fonts ship inside the file; 05_DESIGN.md updated: accent becomes #ff7a59) |
+| 21 | — (added in v2) | — | top-coded wages served as floors | **WIRED**: a top-coded target shows "≥" on every pay figure (`wage_is_floor`); the $208k floor makes top-paying occupations visible without guessing |
+| 22 | — (added in v2) | — | all computed facts for a move | **WIRED**: "Explain my plan with Claude" opens claude.ai with a prompt carrying ONLY pipeline-computed facts and an explicit no-invented-statistics instruction |
+| 23 | Regional scope | implicit US | US-only taxonomies (O*NET-SOC/OEWS) | **WIRED as US edition**: stated in the Data section; EU (ESCO) is a planned separate edition — taxonomies are never mixed |
 
 ## Approach taken
 

@@ -360,7 +360,8 @@ a{color:#e8ece9;text-decoration:none}a:hover{color:#2ee08a}
 
     <section id="data" data-screen-label="Data" style="display:flex;flex-direction:column;gap:10px;color:#8a948e;font-size:13px;padding-bottom:40px">
       <h2 style="margin:0;font-size:20px;font-weight:500;color:#e8ece9">Data &amp; limitations</h2>
-      <p style="margin:0;max-width:760px">O*NET skills, Job Zones &amp; tasks (USDOL/ETA, CC BY 4.0) · BLS OEWS median wages · AIOE (Felten, Raj &amp; Seamans) · "GPTs are GPTs" (OpenAI) · "Working with AI" (Microsoft Research). Profiles describe the typical job holder, not you; exposure is not certain job loss; licensed occupations need certifications the model can't see. Analysis of public data — not career advice.</p>
+      <p style="margin:0;max-width:760px">O*NET skills, Job Zones, tasks &amp; technology skills (USDOL/ETA, CC BY 4.0) · BLS OEWS median wages &amp; education/training assignments · AIOE (Felten, Raj &amp; Seamans) · "GPTs are GPTs" (OpenAI) · "Working with AI" (Microsoft Research). Profiles describe the typical job holder, not you; exposure is not certain job loss. A "≥" wage means the government caps published medians at $208,000 — the real figure is at least that. Analysis of public data — not career advice.</p>
+      <p style="margin:0;max-width:760px"><span style="color:#e8ece9">US edition.</span> All datasets share the US O*NET-SOC / OEWS occupation codes, so every number is comparable. An EU edition (ESCO taxonomy) is planned — mixing the two taxonomies would break that consistency, so we don't.</p>
     </section>
   </main>
 
@@ -390,7 +391,7 @@ a{color:#e8ece9;text-decoration:none}a:hover{color:#2ee08a}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <div style="background:#181d1b;border-radius:10px;padding:10px 12px"><p style="margin:0;font-size:11px;color:#6f7a74">Estimated time</p><p style="margin:0;font-size:15px;font-weight:500">{{ drawer.time }}</p></div>
       <div style="background:#181d1b;border-radius:10px;padding:10px 12px"><p style="margin:0;font-size:11px;color:#6f7a74">Skills to close</p><p style="margin:0;font-size:15px;font-weight:500">{{ drawer.skills }}</p></div>
-      <div style="background:#181d1b;border-radius:10px;padding:10px 12px"><p style="margin:0;font-size:11px;color:#6f7a74">License needed</p><p style="margin:0;font-size:15px;font-weight:500">{{ drawer.license }}</p></div>
+      <div style="background:#181d1b;border-radius:10px;padding:10px 12px"><p style="margin:0;font-size:11px;color:#6f7a74">Typical requirements</p><p style="margin:0;font-size:15px;font-weight:500">{{ drawer.license }}</p></div>
     </div>
     <div style="height:150px;perspective:900px;transform-style:preserve-3d;position:relative;overflow:hidden">{{ skillStack }}</div>
     <p style="margin:0;font-size:12px;color:#e05a4a;display:flex;justify-content:space-between"><span>Must learn — start here</span><span>{{ drawer.acquireCount }}</span></p>
@@ -409,6 +410,18 @@ a{color:#e8ece9;text-decoration:none}a:hover{color:#2ee08a}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><p style="margin:0;font-size:12px;color:#8a948e">{{ drawer.have }}</p><button sc-camel-on-click="{{ drawer.copySkills }}" style="flex:none;background:none;border:1px solid #2b332f;color:#e8ece9;border-radius:8px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap">{{ copyLabel }}</button></div>
       <p style="margin:0;font-size:11px;color:#6f7a74">Recruiters search by these exact skill names — make sure they're on your resume and profile.</p>
     </div>
+    <sc-if value="{{ drawer.hasTech }}" hint-placeholder-val="{{ false }}">
+      <p style="margin:4px 0 0;font-size:12px;color:#e8ece9;font-weight:500">Real tools &amp; certifications for this job</p>
+      <sc-for list="{{ drawer.techRows }}" as="t" hint-placeholder-count="3">
+        <div style="background:#181d1b;border:1px solid #232826;border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.name }}</span>
+          <span style="{{ t.hotStyle }}">hot tech</span>
+          <a href="{{ t.cos }}" target="_blank" rel="noopener" style="margin-left:auto;flex:none;font-size:12px;color:{{ accent }};text-decoration:none;white-space:nowrap">Certifications →</a>
+          <a href="{{ t.coursera }}" target="_blank" rel="noopener" style="flex:none;font-size:12px;color:{{ accent }};text-decoration:none;white-space:nowrap">Courses →</a>
+        </div>
+      </sc-for>
+      <p style="margin:0;font-size:11px;color:#6f7a74">These are the tools O*NET actually lists for this occupation ("hot tech" = frequently required in job postings). The links open real searches on CareerOneStop (US DOL) and Coursera — SkillBridge never invents a certification.</p>
+    </sc-if>
     <p style="margin:6px 0 0;font-size:12px;color:#8a948e;display:flex;justify-content:space-between"><span style="color:#e8ece9;font-weight:500">Your plan, with dates</span><span>{{ drawer.planDone }}</span></p>
     <sc-for list="{{ drawer.milestones }}" as="ms" hint-placeholder-count="3">
       <label style="display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;font-size:13px;min-height:44px">
@@ -419,6 +432,7 @@ a{color:#e8ece9;text-decoration:none}a:hover{color:#2ee08a}
     </sc-for>
     <div style="margin-top:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button sc-camel-on-click="{{ drawer.save }}" style="background:{{ accent }};color:#0b241a;font:inherit;font-weight:500;border:none;border-radius:10px;padding:10px 16px;font-size:13px;cursor:pointer;white-space:nowrap">{{ drawer.saveLabel }}</button>
+      <a href="{{ drawer.claudeHref }}" target="_blank" rel="noopener" style="background:none;color:{{ accent }};border:1px solid {{ accent }}66;border-radius:10px;padding:10px 14px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;text-decoration:none;text-align:center">✦ Explain my plan with Claude</a>
       <a href="{{ drawer.mailto }}" style="background:none;color:#e8ece9;border:1px solid #2b332f;border-radius:10px;padding:10px 14px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;text-decoration:none;text-align:center">Email card</a>
       <button sc-camel-on-click="{{ drawer.compare }}" style="background:none;color:#e8ece9;border:1px solid #2b332f;border-radius:10px;padding:10px 14px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap">Compare</button>
       <span style="margin-left:auto;color:#6f7a74;font-size:11px">Public data · not career advice</span>

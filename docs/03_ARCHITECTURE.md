@@ -81,7 +81,7 @@ Deploy:        GitHub Pages (free, static edition: skillbridge.export_static, bu
 dim_occupation        (soc_code PK, onet_soc_code, title, description)
 dim_descriptor        (descriptor_id PK, name, domain: skill|knowledge|ability|activity)
 dim_metro             (area_code PK, area_name, state, lat, lon)
-dim_soc_crosswalk     (onet_soc_code, soc_code, oews_code)   -- tested join spine
+dim_soc_crosswalk     (onet_soc_code, soc_code, has_wage_row)  -- code-based join spine (8-digit O*NET-SOC truncates to 6-digit SOC); dbt-tested wage coverage
 
 fct_occupation_descriptor (soc_code, descriptor_id, importance, level)  -- suppressed rows filtered
 fct_wages             (oews_code, area_code, emp, wage_median, wage_p10..p90)  -- NULLs for suppressed
@@ -102,7 +102,7 @@ mart_metro_wages           (from_soc, to_soc, area_code, wage_delta_metro)
   `gap = α·cosine_distance + β·Σ max(0, target_LV − origin_LV) × target_IM_norm + γ·max(0, JZ_t − JZ_o)/4 + δ·(1 − task_similarity)`
   Only *deficits* count in β and γ. The γ term is O*NET Job Zone (education/preparation) distance — without it, occupations with similar cognitive profiles but very different credentials look deceptively close. The δ term is TF-IDF cosine similarity over each occupation's 19k O*NET task statements — the domain-affinity signal ("processes financial transactions" vs "operates locomotives") that the 11 basic skills cannot carry. Defaults α=0.15, β=0.25, γ=0.30, δ=0.30.
 - Feasibility additionally requires: target Job Zone ≤ origin + 1 (one education level per move) and target national employment ≥ 20k (no wage-outlier niche occupations).
-- The Related-Occupations validation is deferred with the full O*NET 31.0 download (that table is not in the local-edition sources); the engine's synthetic-fixture tests cover frontier/gap/path correctness instead.
+- The Related-Occupations validation runs in precompute: for every O*NET Related-Occupations pair inside the serving set, the related target's skill gap should rank in the origin's closest quartile; the hit rate is written to `meta.json` (`related_validation_top_quartile`) and the quality report.
 
 ### 4.2 AI-exposure triangulation
 - Convert each source to a percentile rank (they use incompatible scales).
@@ -148,7 +148,7 @@ Feature-by-feature wiring and honest substitutions: docs/07_UI_GAP_ANALYSIS.md.
 | Layer | Tests |
 |---|---|
 | Ingestion | checksum/row-count per source; schema snapshot tests |
-| dbt | not-null/unique keys; **crosswalk coverage ≥95%**; suppressed-value handling; accepted-values on scales |
+| dbt | not-null/unique keys; **crosswalk wage coverage gate** (code-based spine, `min_crosswalk_coverage`); wage-floor honesty (`wage_is_floor` ⇒ exactly \$208k, only when top-coded); full-descriptor-space guard (≥100 descriptors); suppressed-value handling; accepted-values/range checks on scales |
 | Engine | frontier correctness on synthetic fixtures; asymmetry property (`gap(a,b) ≠ gap(b,a)`); Related-Occupations sanity assertion; path-search determinism |
 | API | endpoint **contract tests** (FastAPI TestClient) — now load-bearing: the browser depends entirely on these response shapes; plus a smoke test that `GET /` serves the frontend |
 | CI | GitHub Actions: ruff + pytest + dbt build/test on a bundled 20-occupation sample so CI needs no downloads |

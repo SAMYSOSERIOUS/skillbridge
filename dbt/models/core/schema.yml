@@ -9,7 +9,7 @@ models:
         tests: [not_null]
   - name: dim_soc_crosswalk
     columns:
-      - name: occupation_name
+      - name: onet_soc_code
         tests: [not_null, unique]
       - name: soc_code
         tests: [not_null]
@@ -35,3 +35,18 @@ models:
     tests:
       - dbt_utils_unique_combination:
           combination: [soc_code, skill]
+    columns:
+      - name: importance
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+      - name: skill_level
+        tests:
+          - dbt_utils_range_check:
+              min_value: 0
+              max_value: 1
+  - name: fct_tech
+    tests:
+      - dbt_utils_unique_combination:
+          combination: [soc_code, technology]
