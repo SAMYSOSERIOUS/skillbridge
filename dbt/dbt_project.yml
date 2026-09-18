@@ -12,6 +12,9 @@ vars:
   agreement_spread: 0.25
   # Crosswalk quality gate (docs/04_DATASETS.md D6)
   min_crosswalk_coverage: 0.95
+  # A tool listed by more than this share of occupations is 'generic'
+  # (Excel, Word, ...) and is collapsed in the UI's tools panel.
+  generic_tool_share: 0.30
 
 models:
   skillbridge:

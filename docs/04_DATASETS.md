@@ -51,6 +51,13 @@ Top-code note: in the May 2021 OEWS release, `#` means an annual wage
 serves an honest **floor** (`wage_serving = 208000`, `wage_is_floor = true`,
 shown as "≥" in the UI) so top-paying occupations are visible without guessing.
 
+**Distinctive tools first:** a tool listed by most occupations (Excel,
+Word, email) says nothing about a specific job, so the pipeline counts how
+many occupations list each tool and ranks a job's tools hot-first, then
+rarest-first; tools listed by more than `generic_tool_share` (30%) of
+occupations are flagged generic and the UI collapses them into one line.
+All counts come from the real O*NET Technology Skills table.
+
 **Certification pointers, honestly:** each O*NET-listed technology links to
 the **vendor's official certification page** when it matches a curated map
 maintained in code (Tableau, Microsoft, SAS, AWS, Google, Oracle, Salesforce,

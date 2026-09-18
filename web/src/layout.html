@@ -373,7 +373,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
 </style>
 </helmet>
 
-<div style="min-height:100vh;display:flex;flex-direction:column;background:var(--color-bg);color:var(--color-text)">
+<div id="sb-app" style="min-height:100vh;display:flex;flex-direction:column;background:var(--color-bg);color:var(--color-text)">
   <header class="nav" style="position:sticky;top:0;z-index:10;background:var(--color-bg);padding:var(--space-3) clamp(20px,5vw,72px)">
     <a href="#" sc-camel-on-click="{{ restart }}" class="nav-brand" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none">{{ logoCube }}SkillBridge</a>
     <span class="text-muted" style="font-size:13px;white-space:nowrap">US edition · public data, not career advice</span>
@@ -637,13 +637,14 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
               <a href="{{ t.href }}" target="_blank" rel="noopener" style="margin-left:auto;font-size:13px;white-space:nowrap">{{ t.linkLabel }}</a>
             </div>
           </sc-for>
+          <sc-if value="{{ drawer.hasTechGeneric }}" hint-placeholder-val="{{ false }}"><p style="margin:10px 0 0;padding-top:10px;border-top:1px solid var(--color-divider);font-size:13px;color:var(--color-neutral-700)">{{ drawer.techGenericLine }}</p></sc-if>
           </sc-if>
         </div>
 
         <div style="background:var(--color-surface);padding:26px 28px 28px;position:sticky;top:120px;animation:sbrise .7s cubic-bezier(.22,1,.36,1) .25s backwards">
           <div aria-hidden="true" style="position:absolute;left:0;right:0;top:0;height:2px;background:var(--color-accent);transform-origin:left;animation:sbdraw 1.1s cubic-bezier(.22,1,.36,1) .3s backwards"></div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px"><h3 style="margin:0;font-size:20px">Your checklist, with dates</h3><span style="font-size:13px;color:var(--color-neutral-700);white-space:nowrap">{{ drawer.planDone }}</span></div>
-          <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--color-neutral-800)">Dates are suggested from the typical preparation time. Edit them, tick items off — it's saved on this device.</p>
+          <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--color-neutral-800)">Dates are suggested from the typical preparation time. Edit them, tick items off — it's saved on this device. Download the PDF to keep your plan anywhere.</p>
           <sc-for list="{{ drawer.milestones }}" as="ms" hint-placeholder-count="4">
             <label style="display:grid;grid-template-columns:20px 1fr;gap:6px 12px;align-items:start;font-size:14px;line-height:1.45;padding:12px 0;border-top:1px solid var(--color-divider)">
               <input type="checkbox" checked="{{ ms.done }}" sc-camel-on-change="{{ ms.toggle }}" style="width:16px;height:16px;accent-color:var(--color-accent);margin:3px 0 0">
@@ -652,7 +653,9 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
             </label>
           </sc-for>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
-            <button sc-camel-on-click="{{ drawer.save }}" class="btn btn-primary btn-block" style="min-height:44px">{{ drawer.saveLabel }}</button>
+            <button sc-camel-on-click="{{ drawer.printPlan }}" class="btn btn-primary btn-block" style="min-height:44px">Download my plan (PDF)</button>
+            <button sc-camel-on-click="{{ drawer.downloadCsv }}" class="btn btn-secondary btn-block" style="min-height:44px">Download as CSV</button>
+            <button sc-camel-on-click="{{ drawer.save }}" class="btn btn-secondary btn-block" style="min-height:44px">{{ drawer.saveLabel }}</button>
             <a href="{{ drawer.claudeHref }}" target="_blank" rel="noopener" class="btn btn-secondary btn-block" style="min-height:44px;margin-top:0">Explain my plan with Claude</a>
             <a href="{{ drawer.mailto }}" class="btn btn-secondary btn-block" style="min-height:44px;margin-top:0">Email me this plan</a>
           </div>
@@ -664,6 +667,54 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
         <button sc-camel-on-click="{{ toStep1 }}" class="btn btn-secondary" style="min-height:44px">Start over</button>
       </div>
     </section>
+
+    <!-- Printable "My Plan" document: hidden on screen, becomes the whole
+         page when printing / saving as PDF. Same computed facts, no styling
+         tricks - built for paper. -->
+    <style>
+      #sb-print{display:none}
+      @media print{
+        #sb-app{display:none !important}
+        #sb-print{display:block !important;color:#111;font:13px/1.55 Geist,Arial,sans-serif;max-width:100%}
+        #sb-print h1,#sb-print h2{font-family:Geist,Arial,sans-serif}
+        #sb-print a{color:#111;text-decoration:none}
+        #sb-print .pr-link::after{content:" — " attr(href);font-size:10.5px;color:#555;word-break:break-all}
+        @page{margin:14mm}
+      }
+    </style>
+    <div id="sb-print" aria-hidden="true">
+      <div style="border-bottom:3px solid #111;padding-bottom:10px;margin-bottom:14px">
+        <div style="font-weight:800;font-size:11px;letter-spacing:.1em">SKILLBRIDGE · MY PLAN</div>
+        <h1 style="margin:6px 0 2px;font-size:23px;line-height:1.15">{{ drawer.pair }}</h1>
+        <div style="font-size:11px;color:#555">Generated {{ drawer.printedOn }} · computed from US public data · not career advice</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12.5px">
+        <tr>
+          <td style="padding:6px 10px 6px 0;border-bottom:1px solid #ccc"><b>Pay change</b><br>{{ drawer.pay }}/yr</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #ccc"><b>Estimated time</b><br>{{ drawer.time }}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #ccc"><b>Skills to close</b><br>{{ drawer.skills }}</td>
+          <td style="padding:6px 0 6px 10px;border-bottom:1px solid #ccc"><b>Typical entry requirement</b><br>{{ drawer.license }}</td>
+        </tr>
+      </table>
+      <h2 style="margin:14px 0 4px;font-size:15px">1 · Skills to learn from scratch</h2>
+      <sc-for list="{{ drawer.acquire }}" as="s" hint-placeholder-count="2">
+        <div style="padding:4px 0;border-bottom:1px solid #e2e2e2;font-size:12.5px"><b>{{ s.skill }}</b> · level {{ s.levels }} (O*NET 0–100) · <a class="pr-link" href="{{ s.href }}">course search</a></div>
+      </sc-for>
+      <h2 style="margin:14px 0 4px;font-size:15px">2 · Skills to upgrade on the job</h2>
+      <p style="margin:0;font-size:12.5px"><sc-for list="{{ drawer.upgrade }}" as="u" hint-placeholder-count="3"><span>{{ u }} · </span></sc-for></p>
+      <h2 style="margin:14px 0 4px;font-size:15px">3 · Tools &amp; certifications employers expect</h2>
+      <sc-for list="{{ drawer.techRows }}" as="t" hint-placeholder-count="2">
+        <div style="padding:4px 0;border-bottom:1px solid #e2e2e2;font-size:12.5px"><b>{{ t.name }}</b> · <a class="pr-link" href="{{ t.href }}">{{ t.linkLabel }}</a></div>
+      </sc-for>
+      <h2 style="margin:14px 0 4px;font-size:15px">4 · Checklist</h2>
+      <sc-for list="{{ drawer.milestones }}" as="ms" hint-placeholder-count="3">
+        <div style="padding:4px 0;font-size:12.5px">{{ ms.box }} &nbsp;{{ ms.title }} — <b>{{ ms.date }}</b></div>
+      </sc-for>
+      <div style="margin-top:16px;border-top:2px solid #111;padding-top:8px;font-size:10.5px;color:#555;line-height:1.5">
+        Sources: O*NET skills, Job Zones &amp; technology skills (USDOL/ETA, CC BY 4.0) · BLS OEWS median wages · education/training from BLS Employment Projections or O*NET's ETE table · AIOE (Felten, Raj &amp; Seamans) · "GPTs are GPTs" (OpenAI) · "Working with AI" (Microsoft Research).
+        Wages are national medians; a "≥" figure is a government floor. Profiles describe the typical job holder, not you. Analysis of public data — not career advice.
+      </div>
+    </div>
     </sc-if>
   </main>
 

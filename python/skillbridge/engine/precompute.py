@@ -42,7 +42,10 @@ def load_marts() -> tuple[pd.DataFrame, pd.DataFrame]:
         "select soc_code, skill, importance, skill_level from mart_skill_matrix"
     ).df()
     tasks = con.execute("select soc_code, task_text from stg_onet_tasks").df()
-    tech = con.execute("select soc_code, technology, hot from mart_tech").df()
+    tech = con.execute(
+        "select soc_code, technology, hot, generic from mart_tech "
+        "order by soc_code, hot desc, generic asc, technology"
+    ).df()
     related = con.execute(
         "select soc_code, related_soc_code from stg_onet_related "
         "where tier = 'Primary-Short' or tier = 'Primary-Long' or tier like 'Primary%'"

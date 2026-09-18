@@ -197,3 +197,12 @@ same `/data/*.json` contract, new look:
 - Retired with this design: the 3-D orbit map/flat/list view switcher and
   the compare tray (scope rule §28 of INSTRUCTIONS.md — the wizard's chart +
   ranked table carry the same information with less clutter).
+
+- **Plan export (no accounts, by design):** step 4 offers "Download my plan
+  (PDF)" (a print-only document `#sb-print` — the browser's print-to-PDF is
+  the PDF engine, so it works on free static hosting) and "Download as CSV"
+  (built in the browser from the on-screen plan). Checklist state stays in
+  the browser on that device; the copy says so and points to the PDF for
+  keeping the plan anywhere. Generic office tools collapse into one quiet
+  line under the tools list; distinctive (rare-across-occupations) tools
+  rank first.

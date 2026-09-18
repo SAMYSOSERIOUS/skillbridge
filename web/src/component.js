@@ -166,10 +166,17 @@ class Component extends DCLogic {
         ...(upgradeNames.length?[{k:'up',title:'Upgrade '+upgradeNames.slice(0,2).join(' & ')+(upgradeNames.length>2?' +'+(upgradeNames.length-2):'')+' on the job',mo:dm.months*0.8}]:[]),
         {k:'lic',title:'Check your state’s license or certification rules for '+dm.title,mo:dm.months*0.9},{k:'apply',title:'Apply for '+dm.title+' roles',mo:dm.months}];
       const savePlan=p=>{ const plans={...S.plans,[dm.id]:p}; this.persist('sb.plans',plans); this.setState({plans}); };
-      const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,date:st.date||ym(it.mo),style:done?'color:var(--color-neutral-600);text-decoration:line-through':'',toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
+      const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,box:done?'☑':'☐',date:st.date||ym(it.mo),style:done?'color:var(--color-neutral-600);text-decoration:line-through':'',toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
       const doneN=milestones.filter(m=>m.done).length;
       const mailBody=`My SkillBridge plan%0A${o.title} → ${dm.title}%0APay: ${this.fmtPay(dm)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
-      const techRows=(dm.tech||[]).slice(0,6).map(t=>{ const cert=this.certFor(t.name); return {name:t.name,hotDot:t.hot?'display:inline-block;width:8px;height:8px;background:var(--color-accent);flex:none':'display:inline-block;width:8px;height:8px;flex:none',linkLabel:cert?`${cert.vendor} certification →`:'Find courses →',href:cert?cert.href:'https://www.classcentral.com/search?q='+encodeURIComponent(t.name)}; });
+      // Distinctive tools first ('same certifications everywhere' fix):
+      // the pipeline flags tools listed by most occupations as generic;
+      // those collapse into one quiet line instead of six Office rows.
+      const techAll=dm.tech||[];
+      const techDistinct=techAll.filter(t=>!t.generic), techGen=techAll.filter(t=>t.generic);
+      const techPick=(techDistinct.length?techDistinct:techAll).slice(0,6);
+      const techRows=techPick.map(t=>{ const cert=this.certFor(t.name); return {name:t.name,hotDot:t.hot?'display:inline-block;width:8px;height:8px;background:var(--color-accent);flex:none':'display:inline-block;width:8px;height:8px;flex:none',linkLabel:cert?`${cert.vendor} certification →`:'Find courses →',href:cert?cert.href:'https://www.classcentral.com/search?q='+encodeURIComponent(t.name)}; });
+      const techGenericLine=(techDistinct.length&&techGen.length)?('Plus everyday office software most jobs list: '+techGen.slice(0,5).map(t=>t.name).join(', ')+'.'):'';
       const claudePrompt=`I'm exploring a career move with SkillBridge AI, which computes everything from real public data (O*NET, BLS OEWS, three AI-exposure indices). Reason only from these computed facts plus general career knowledge, and do not invent statistics:
 - Current job: ${o.title}, US median ${o.floor?'at least ':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr, education zone ${o.zone} of 5.
 - Target: ${dm.title}, pay change ${this.fmtPay(dm)}/yr (national medians${dm.floor?'; the target median is top-coded, so this is a floor':''}), preparation ${dm.time}.
@@ -179,12 +186,24 @@ class Component extends DCLogic {
 - Real tools/software O*NET lists for the target: ${(dm.tech||[]).slice(0,8).map(t=>t.name).join(', ')||'none listed'}.
 Explain in plain language whether this move makes sense for me, sketch a realistic month-by-month plan built on those exact skills and tools, and finish with what this data cannot tell me.`;
       const total=dt.acquire.length+dt.upgrade.length+dt.have.length;
+      const csvEsc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+      const csvRows=[['type','item','detail','target date','link'],
+        ...dt.acquire.map(a=>['skill to learn',a.skill,'level '+a.o+' → '+a.t,'','https://www.classcentral.com/search?q='+encodeURIComponent(a.skill)]),
+        ...upgradeNames.map(u=>['skill to upgrade',u,'practice on the job','','']),
+        ...techRows.map(t=>['tool / certification',t.name,t.linkLabel.replace(' →',''),'',t.href]),
+        ...milestones.map(ms=>['milestone',ms.title,ms.done?'done':'open',ms.date,''])];
+      const downloadCsv=()=>{ try{ const txt=csvRows.map(r=>r.map(csvEsc).join(',')).join('\r\n');
+        const blob=new Blob(['\ufeff'+txt],{type:'text/csv;charset=utf-8'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='my-plan-'+dm.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.csv';
+        document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); }catch(e){} };
+      const printPlan=()=>{ try{ window.print(); }catch(e){} };
       drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmtPayRv(dm),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${total}`,license:dm.license,
         intro:`Here is what the O*NET skill profiles say separates your job from this one. Of ${total} skills that matter for ${dm.title}, you already hold ${dt.have.length} at the required level, ${dt.upgrade.length} need strengthening, and ${dt.acquire.length} must be learned from scratch.`,
         acquireIntro:dt.acquire.length?`Start here — these are the biggest gaps. The bar shows how much each one matters for the target job. Levels are O*NET's 0–100 scale: yours today → what the job needs.`:'Nothing to learn from scratch — every key skill is already in your profile at some level.',
         acquire,upgradeIntro:upgradeNames.length?'You already have these, just not yet at the level the job asks for. Most people close these gaps through practice and stretch assignments rather than courses.':'Nothing to upgrade — your existing skills are either already at level or need learning from scratch.',
         upgrade:upgradeNames,have:haveNames.length?'Already at the target level: '+haveNames.join(', ')+'.':'No skills at the target level yet — the lists above are the whole path.',
-        techRows,hasTech:techRows.length>0,milestones,planDone:`${doneN} of ${milestones.length} done`,
+        techRows,hasTech:techRows.length>0,techGenericLine,hasTechGeneric:!!techGenericLine,milestones,planDone:`${doneN} of ${milestones.length} done`,printPlan,downloadCsv,printedOn:new Date().toISOString().slice(0,10),
         mailto:`mailto:?subject=${encodeURIComponent('My career plan: '+dm.title)}&body=${mailBody}`,claudeHref:'https://claude.ai/new?q='+encodeURIComponent(claudePrompt),
         copySkills:()=>{ const txt=haveNames.concat(upgradeNames).join(', '); if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); this.setState({copied:true}); setTimeout(()=>this.setState({copied:false}),1800); },
         save:toggleSave(dm),saveLabel:S.saved.includes(dm.id)?'Saved ✓':'Save this plan'}; }

@@ -89,7 +89,11 @@ def _load_real() -> dict:
     if tech_path.exists():
         for r in pd.read_parquet(tech_path).itertuples(index=False):
             tech_by_soc.setdefault(r.soc_code, []).append(
-                {"name": r.technology, "hot": bool(r.hot)}
+                {
+                    "name": r.technology,
+                    "hot": bool(r.hot),
+                    "generic": bool(getattr(r, "generic", False)),
+                }
             )
 
     def _edu(r) -> dict | None:
