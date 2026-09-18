@@ -137,14 +137,30 @@ def main() -> int:
             return 1
 
         zf = zipfile.ZipFile(io.BytesIO(blob))
-        by_base = {Path(n).name: n for n in zf.namelist()}
+        # Case-insensitive basename index: zips have varied in nesting and case
+        # across O*NET releases.
+        by_base = {Path(n).name.lower(): n for n in zf.namelist()}
         failures = []
         for fname, (out_name, min_rows) in ONET_TABLES.items():
-            member = by_base.get(fname)
-            if member is None:
-                failures.append(f"{fname}: not in zip")
-                continue
-            df = read_onet_table(zf.read(member))
+            raw_bytes = None
+            member = by_base.get(fname.lower())
+            if member is not None:
+                raw_bytes = zf.read(member)
+            else:
+                # Not in the zip (release 31.0 ships some tables only as
+                # standalone files). O*NET also hosts every table individually
+                # under db_{v}_text/ - fetch just the missing one from there.
+                solo = (
+                    f"https://www.onetcenter.org/dl_files/database/"
+                    f"db_{chosen}_text/{fname.replace(' ', '%20')}"
+                )
+                try:
+                    print(f"[solo] {fname}: not in zip, fetching {solo}")
+                    raw_bytes = _get(solo)
+                except Exception as exc:  # noqa: BLE001 - report and fail below
+                    failures.append(f"{fname}: not in zip and solo fetch failed ({exc})")
+                    continue
+            df = read_onet_table(raw_bytes)
             if len(df) < min_rows:
                 failures.append(f"{fname}: only {len(df)} rows (expected >= {min_rows})")
                 continue
@@ -154,6 +170,9 @@ def main() -> int:
             print("INGEST FAILED (O*NET schema changed?):")
             for f in failures:
                 print(f"  - {f}")
+            print("Zip contents were:")
+            for n in sorted(zf.namelist()):
+                print(f"    {n}")
             return 1
         (RAW / "VERSION").write_text(f"O*NET {chosen.replace('_', '.')} text database\n")
         print(f"[ ok ] O*NET release {chosen.replace('_', '.')} pinned")
