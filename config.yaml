@@ -12,6 +12,13 @@ frontier:
   feasibility_tau_percentile: 65   # skill_gap <= this pct of all gaps from origin
   max_job_zone_step_up: 1          # a single move can climb at most one O*NET Job Zone
   min_target_employment: 20000     # targets need real national headcount (no wage-outlier niches)
+  # Realism gate on the frontier itself (same principle as paths.relatedness_gate):
+  # a move is served only if O*NET's own Related Occupations lists the target
+  # for this origin, or the target is within the origin's closest gap quantile
+  # among otherwise-feasible candidates. This governs the verdict, the cards,
+  # and the chart - not just multi-hop routes.
+  relatedness_gate: true
+  close_gap_quantile: 0.15
 
 exposure:
   agreement_max_spread: 0.25       # max-min source pct rank <= this => sources agree

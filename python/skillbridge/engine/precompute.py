@@ -144,6 +144,10 @@ def main() -> int:
     close_q = float(cfg["paths"].get("close_gap_quantile", 0.10))
     route_edges_kept = route_edges_gated = 0
 
+    fr_gate_on = bool(fr.get("relatedness_gate", False))
+    fr_close_q = float(fr.get("close_gap_quantile", 0.15))
+    frontier_kept = frontier_gated = 0
+
     for o in range(n):
         g = gaps[o].copy()
         g[o] = np.inf
@@ -155,6 +159,17 @@ def main() -> int:
             & (employment >= min_emp)
         )
         idx = np.where(feasible)[0]
+        # Frontier realism gate: the same O*NET-relatedness principle that
+        # governs routes also governs what the frontier serves at all, so
+        # the verdict can never crown a superficially similar outlier.
+        if fr_gate_on and len(idx):
+            fr_thresh = float(np.quantile(g[idx], fr_close_q))
+            keep = np.array(
+                [(o, int(t)) in rel_pairs or g[t] <= fr_thresh for t in idx]
+            )
+            frontier_gated += int((~keep).sum())
+            frontier_kept += int(keep.sum())
+            idx = idx[keep]
 
         pareto_mask = core.pareto_front(g[idx], wage_delta[o, idx], exp_delta[o, idx])
         pareto_set = set(idx[pareto_mask])
@@ -284,6 +299,8 @@ def main() -> int:
         "precompute_seconds": round(time.time() - t0, 1),
         "related_validation_top_quartile": related_validation,
         "related_pairs_checked": int(total),
+        "frontier_moves_kept": int(frontier_kept),
+        "frontier_moves_gated_out": int(frontier_gated),
         "route_edges_kept": int(route_edges_kept),
         "route_edges_gated_out": int(route_edges_gated),
     }
