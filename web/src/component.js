@@ -33,6 +33,38 @@ class Component extends DCLogic {
   // O*NET Job Zone preparation bands (official zone definitions, not estimates)
   zonePrep(z){ return {1:'zone 1 · little prep',2:'zone 2 · weeks–months prep',3:'zone 3 · 1–2 yrs prep',4:'zone 4 · 2–4 yrs prep',5:'zone 5 · 4+ yrs prep'}[Math.round(z)]||'prep varies'; }
   zoneMonths(z){ return {1:1,2:3,3:12,4:30,5:48}[Math.round(z)]||6; }
+  // Official certification pages for widely-listed O*NET technologies.
+  // These are the vendors' own cert/credential landing pages - real,
+  // maintained here in code, never generated. Anything unmatched falls back
+  // to a multi-provider course search (Class Central, works worldwide).
+  certFor(name){ const n=' '+name.toLowerCase()+' ';
+    const CERTS=[
+      [/tableau/, 'Tableau', 'https://www.tableau.com/learn/certification'],
+      [/power bi|powerbi/, 'Microsoft', 'https://learn.microsoft.com/en-us/credentials/browse/?terms=power%20bi'],
+      [/microsoft (excel|word|office|access|outlook|powerpoint|project|azure|dynamics|sharepoint|teams|visio|sql server)/, 'Microsoft', null],
+      [/\bsas\b/, 'SAS', 'https://www.sas.com/en_us/certification.html'],
+      [/amazon web services|\baws\b/, 'AWS', 'https://aws.amazon.com/certification/'],
+      [/google analytics|google ads/, 'Google', 'https://skillshop.withgoogle.com/'],
+      [/google cloud/, 'Google Cloud', 'https://cloud.google.com/learn/certification'],
+      [/salesforce/, 'Salesforce', 'https://trailhead.salesforce.com/credentials'],
+      [/\boracle\b|peoplesoft|mysql|\bjava\b/, 'Oracle', 'https://education.oracle.com/certification'],
+      [/\bcisco\b/, 'Cisco', 'https://www.cisco.com/site/us/en/learn/training-certifications/certifications/index.html'],
+      [/comptia/, 'CompTIA', 'https://www.comptia.org/certifications'],
+      [/adobe|photoshop|illustrator|indesign|acrobat|premiere|after effects/, 'Adobe', 'https://certification.adobe.com/'],
+      [/autodesk|autocad|\brevit\b|fusion 360|inventor/, 'Autodesk', 'https://www.autodesk.com/certification'],
+      [/\bpython\b/, 'Python Institute', 'https://pythoninstitute.org/certification'],
+      [/arcgis|\besri\b/, 'Esri', 'https://www.esri.com/training/certification/'],
+      [/matlab/, 'MathWorks', 'https://www.mathworks.com/services/training/certification.html'],
+      [/solidworks/, 'SolidWorks', 'https://www.solidworks.com/solidworks-certification-program'],
+      [/kubernetes|\blinux\b/, 'Linux Foundation', 'https://training.linuxfoundation.org/certification/'],
+      [/\bibm\b|spss/, 'IBM', 'https://www.ibm.com/training/credentials'],
+      [/quickbooks/, 'Intuit', 'https://quickbooks.intuit.com/accountants/training-certification/'],
+      [/\bunity\b/, 'Unity', 'https://unity.com/products/unity-certifications'],
+      [/servicenow/, 'ServiceNow', 'https://www.servicenow.com/services/training-and-certification.html'],
+    ];
+    for(const [re,vendor,url] of CERTS){ if(re.test(n))
+      return {vendor,href:url||('https://learn.microsoft.com/en-us/credentials/browse/?terms='+encodeURIComponent(name))}; }
+    return null; }
   srcPcts(exp){ const out=[]; if(exp){ if(exp.msft!=null)out.push(['Microsoft Research (observed Copilot use)',exp.msft]);
       if(exp.aioe!=null)out.push(['AIOE (ability-based)',exp.aioe]); if(exp.openai!=null)out.push(['OpenAI (task-based)',exp.openai]); } return out; }
   rng(exp){ const v=this.srcPcts(exp).map(x=>Math.round(x[1]*100)); return v.length?[Math.min(...v),Math.max(...v)]:[0,0]; }
@@ -185,13 +217,19 @@ class Component extends DCLogic {
       const milestones=items.map(it=>{ const st=plan[it.k]||{}; const done=!!st.done; return {title:it.title,done,date:st.date||ym(it.mo),style:`${done?'color:#6f7a74;text-decoration:line-through':''}`,toggle:()=>savePlan({...plan,[it.k]:{...st,done:!done}}),setDate:e=>savePlan({...plan,[it.k]:{...st,date:e.target.value}})}; });
       const doneN=milestones.filter(m=>m.done).length;
       const mailBody=`My SkillBridge escape plan%0A${o.title} → ${dm.title}%0APay: ${this.fmtPay(dm)}/yr · ${dm.time}%0ASkills to learn: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}%0A${location.href}`;
-      // Real tools & certification pointers (O*NET Technology Skills). The
-      // links are real SEARCHES on CareerOneStop and Coursera for the named
-      // tool - SkillBridge never invents a certification (hard rule 1).
-      const techRows=(dm.tech||[]).slice(0,8).map(t=>({name:t.name,
-        hotStyle:t.hot?`flex:none;color:${accent};border:1px solid ${accent}66;border-radius:999px;padding:0 6px;font-size:10px`:'display:none',
-        cos:'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx?keyword='+encodeURIComponent(t.name),
-        coursera:'https://www.coursera.org/search?query='+encodeURIComponent(t.name+' certification')}));
+      // Real tools & certification pointers (O*NET Technology Skills).
+      // One clean action per tool: the vendor's OFFICIAL certification page
+      // when we know it (curated map in certFor - real pages, never
+      // generated), otherwise one multi-provider course search that works
+      // worldwide. Never an invented certification (hard rule 1).
+      // (CareerOneStop was dropped: it geo-blocks visitors outside the US.)
+      const techRows=(dm.tech||[]).slice(0,6).map(t=>{ const cert=this.certFor(t.name);
+        return {name:t.name,
+          hotDot:t.hot?`display:inline-block;width:6px;height:6px;border-radius:50%;background:${accent};margin-right:8px;vertical-align:2px`:'display:none',
+          hotTitle:t.hot?'frequently required in job postings':'',
+          linkLabel:cert?`${cert.vendor} certification →`:'Find courses →',
+          linkStyle:cert?`flex:none;font-size:12px;font-weight:500;color:${accent};text-decoration:none;white-space:nowrap`:'flex:none;font-size:12px;color:#8a948e;text-decoration:none;white-space:nowrap',
+          href:cert?cert.href:'https://www.classcentral.com/search?q='+encodeURIComponent(t.name)}; });
       // "Where is the AI?" - an evidence-fed explainer. The prompt carries ONLY
       // facts the pipeline computed; it explicitly tells Claude not to invent numbers.
       const claudePrompt=`I'm exploring a career move with SkillBridge AI, which computes everything from real public data (O*NET, BLS OEWS, three AI-exposure indices). Reason only from these computed facts plus general career knowledge, and do not invent statistics:

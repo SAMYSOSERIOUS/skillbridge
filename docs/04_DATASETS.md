@@ -51,10 +51,14 @@ Top-code note: in the May 2021 OEWS release, `#` means an annual wage
 serves an honest **floor** (`wage_serving = 208000`, `wage_is_floor = true`,
 shown as "≥" in the UI) so top-paying occupations are visible without guessing.
 
-**Certification pointers, honestly:** the app links each O*NET-listed
-technology to real *searches* — CareerOneStop's certification finder (US DOL)
-and Coursera search. SkillBridge never invents or asserts a specific
-certification.
+**Certification pointers, honestly:** each O*NET-listed technology links to
+the **vendor's official certification page** when it matches a curated map
+maintained in code (Tableau, Microsoft, SAS, AWS, Google, Oracle, Salesforce,
+Adobe, Autodesk, Cisco, CompTIA, Esri, MathWorks, IBM, Linux Foundation, …),
+and otherwise to one multi-provider course search (Class Central). All links
+are real pages that work worldwide; SkillBridge never invents or asserts a
+specific certification. (CareerOneStop was dropped: it geo-blocks visitors
+outside the US.)
 
 **Regional scope:** this is the **US edition** — every dataset shares the US
 O*NET-SOC/OEWS taxonomies, so all numbers are mutually consistent. An EU
