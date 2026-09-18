@@ -96,8 +96,10 @@ def _load_real() -> dict:
         te = getattr(r, "typical_education", None)
         if te is None or pd.isna(te):
             return None
+        src = getattr(r, "education_source", None)
         return {
             "typical_education": str(te),
+            "source": None if src is None or pd.isna(src) else str(src),
             "work_experience": None
             if pd.isna(getattr(r, "work_experience", None))
             else str(r.work_experience),

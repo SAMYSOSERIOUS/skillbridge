@@ -43,7 +43,8 @@ def main() -> int:
     n_skills_dims = q("select count(distinct skill) from mart_skill_matrix")
     n_tech_rows = q("select count(*) from mart_tech")
     n_tech_socs = q("select count(distinct soc_code) from mart_tech")
-    n_edu = q("select count(*) from stg_bls_education")
+    n_edu = q("select count(*) from stg_education")
+    edu_src = q("select coalesce(min(education_source), '') from stg_education")
 
     manifest = json.loads((REPO_ROOT / "data" / "raw" / "manifest.json").read_text())
     lines = [
@@ -95,9 +96,9 @@ def main() -> int:
         "(shown honestly in the UI).",
         f"- Technology Skills (real named tools, certification pointers): "
         f"**{n_tech_rows}** rows across **{n_tech_socs}** occupations.",
-        "- BLS education/training assignments (optional download): "
+        "- Education/training assignments (optional): "
         + (
-            f"**{n_edu}** occupations."
+            f"**{n_edu}** occupations, source: **{edu_src}**."
             if n_edu
             else "**unavailable this build** - requirements fall back to O*NET Job Zones."
         ),

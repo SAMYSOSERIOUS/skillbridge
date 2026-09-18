@@ -25,11 +25,12 @@ select
     jz.job_zone,
     edu.typical_education,
     edu.work_experience,
-    edu.on_the_job_training
+    edu.on_the_job_training,
+    edu.education_source
 from {{ ref('dim_occupation') }} d
 left join {{ ref('fct_wages') }} w using (soc_code)
 left join {{ ref('mart_exposure_triangulated') }} e using (soc_code)
 left join (select distinct soc_code from {{ ref('fct_occupation_skill') }}) sk
     using (soc_code)
 left join jz using (soc_code)
-left join {{ ref('stg_bls_education') }} edu using (soc_code)
+left join {{ ref('stg_education') }} edu using (soc_code)

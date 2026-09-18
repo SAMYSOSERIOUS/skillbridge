@@ -41,6 +41,14 @@ ONET_TABLES = {
     "Related Occupations.txt": ("related_occupations", 5000),
 }
 
+# Optional tables from the SAME accepted zip (never fail the ingest):
+# O*NET's own Education/Training/Experience distributions - the fallback
+# source for typical education when bls.gov refuses cloud IPs.
+ONET_OPTIONAL_TABLES = {
+    "Education, Training, and Experience.txt": ("ete", 10000),
+    "Education, Training, and Experience Categories.txt": ("ete_categories", 30),
+}
+
 BLS_EDU_URLS = [
     # BLS Employment Projections: education/training assignments by occupation.
     # Cascade of the file locations BLS has used; all are the same table.
@@ -49,6 +57,7 @@ BLS_EDU_URLS = [
     "https://www.bls.gov/emp/ind-occ-matrix/edtrain.xlsx",
 ]
 BLS_EDU_COLUMNS = ["soc_code", "typical_education", "work_experience", "on_the_job_training"]
+EDU_COLUMNS = [*BLS_EDU_COLUMNS, "education_source"]
 
 
 def _get(url: str, timeout: int = 180) -> bytes:
@@ -119,6 +128,39 @@ def parse_bls_education(raw: bytes) -> pd.DataFrame:
     raise ValueError("education table: no sheet with the expected header found")
 
 
+def derive_education_from_onet(ete: pd.DataFrame, cats: pd.DataFrame) -> pd.DataFrame:
+    """Modal education/experience/training category per 6-digit SOC from
+    O*NET's Education, Training, and Experience table. Real distributions,
+    real official category labels - we report the single most common
+    category (the mode), never an average or a guess."""
+    wanted = {
+        "Required Level of Education": "typical_education",
+        "Related Work Experience": "work_experience",
+        "On-the-Job Training": "on_the_job_training",
+    }
+    cats = cats.copy()
+    desc = {
+        (r["Element ID"], str(int(float(r["Category"])))): r["Category Description"]
+        for _, r in cats.iterrows()
+    }
+    df = ete.copy()
+    df["field"] = None
+    for needle, field in wanted.items():
+        df.loc[df["Element Name"].str.contains(needle, na=False), "field"] = field
+    df = df[df["field"].notna()].copy()
+    df["soc_code"] = df["O*NET-SOC Code"].str[:7]
+    df["pct"] = pd.to_numeric(df["Data Value"], errors="coerce")
+    df["cat"] = df["Category"].astype(float).astype(int).astype(str)
+    grp = df.groupby(["soc_code", "field", "Element ID", "cat"], as_index=False)["pct"].sum()
+    top = grp.sort_values("pct", ascending=False).drop_duplicates(["soc_code", "field"])
+    top["label"] = [desc.get((r["Element ID"], r["cat"])) for _, r in top.iterrows()]
+    wide = top.pivot(index="soc_code", columns="field", values="label").reset_index()
+    for col in ("typical_education", "work_experience", "on_the_job_training"):
+        if col not in wide.columns:
+            wide[col] = None
+    return wide[["soc_code", "typical_education", "work_experience", "on_the_job_training"]]
+
+
 def main() -> int:
     RAW.mkdir(parents=True, exist_ok=True)
 
@@ -180,28 +222,56 @@ def main() -> int:
             return 1
         for out_name, df in tables.items():
             df.to_parquet(RAW / f"{out_name}.parquet", index=False)
+        # Optional tables from the same zip - warn-only, never fail.
+        by_base = {Path(nm).name.lower(): nm for nm in zf.namelist()}
+        for fname, (out_name, min_rows) in ONET_OPTIONAL_TABLES.items():
+            member = by_base.get(fname.lower())
+            if member is None:
+                print(f"[warn] optional {fname}: not in this release's zip")
+                continue
+            df = read_onet_table(zf.read(member))
+            if len(df) < min_rows:
+                print(f"[warn] optional {fname}: only {len(df)} rows - skipped")
+                continue
+            df.to_parquet(RAW / f"{out_name}.parquet", index=False)
+            print(f"[ ok ] {fname}: {len(df)} rows (optional)")
         (RAW / "VERSION").write_text(f"O*NET {chosen.replace('_', '.')} text database\n")
         print(f"[ ok ] O*NET release {chosen.replace('_', '.')} pinned")
 
-    # --- BLS education/training (optional, degrades gracefully) -----------
-    edu_path = RAW / "bls_education.parquet"
+    # --- Education/training (optional, degrades gracefully) ---------------
+    # Source 1: BLS Employment Projections (best labels). bls.gov blocks
+    # cloud-datacenter IPs (GitHub Actions), so this usually fails in CI.
+    # Source 2: O*NET's own Education/Training/Experience table from the
+    # SAME accepted zip - modal category per occupation, official labels.
+    edu_path = RAW / "education.parquet"
     if edu_path.exists():
-        print("[skip] bls_education: already present")
+        print("[skip] education: already present")
         return 0
     for url in BLS_EDU_URLS:
         try:
             print(f"[try ] BLS education: {url}")
             df = parse_bls_education(_get(url))
+            df["education_source"] = "BLS Employment Projections"
             df.to_parquet(edu_path, index=False)
-            print(f"[ ok ] bls_education: {len(df)} rows")
+            print(f"[ ok ] education: {len(df)} rows (BLS)")
             return 0
         except Exception as exc:  # noqa: BLE001
             print(f"[miss] {exc}")
+    ete_p, cat_p = RAW / "ete.parquet", RAW / "ete_categories.parquet"
+    if ete_p.exists() and cat_p.exists():
+        try:
+            df = derive_education_from_onet(pd.read_parquet(ete_p), pd.read_parquet(cat_p))
+            df["education_source"] = "O*NET Education/Training/Experience (most common category)"
+            df.to_parquet(edu_path, index=False)
+            print(f"[ ok ] education: {len(df)} rows (derived from O*NET ETE)")
+            return 0
+        except Exception as exc:  # noqa: BLE001
+            print(f"[miss] O*NET ETE derivation failed: {exc}")
     print(
-        "[warn] BLS education table unavailable - continuing without it "
-        "(requirements line degrades; counted in data_quality.md)"
+        "[warn] education table unavailable from BLS and O*NET - continuing "
+        "without it (requirements line degrades; counted in data_quality.md)"
     )
-    pd.DataFrame(columns=BLS_EDU_COLUMNS).to_parquet(edu_path, index=False)
+    pd.DataFrame(columns=EDU_COLUMNS).astype(str).to_parquet(edu_path, index=False)
     return 0
 
 

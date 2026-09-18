@@ -33,7 +33,7 @@ def load_marts() -> tuple[pd.DataFrame, pd.DataFrame]:
                wage_serving as wage_median, wage_is_floor, wage_topcoded, employment,
                pct_aioe, pct_openai, pct_msft, n_sources,
                exposure_composite, agreement_flag, has_skills, job_zone,
-               typical_education, work_experience, on_the_job_training
+               typical_education, work_experience, on_the_job_training, education_source
         from mart_occupations
         order by soc_code
         """
@@ -164,9 +164,7 @@ def main() -> int:
         # the verdict can never crown a superficially similar outlier.
         if fr_gate_on and len(idx):
             fr_thresh = float(np.quantile(g[idx], fr_close_q))
-            keep = np.array(
-                [(o, int(t)) in rel_pairs or g[t] <= fr_thresh for t in idx]
-            )
+            keep = np.array([(o, int(t)) in rel_pairs or g[t] <= fr_thresh for t in idx])
             frontier_gated += int((~keep).sum())
             frontier_kept += int(keep.sum())
             idx = idx[keep]

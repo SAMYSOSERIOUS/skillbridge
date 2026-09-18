@@ -91,7 +91,7 @@ class Component extends DCLogic {
         rng:this.rng(tgt.exposure),agree:!!(tgt.exposure&&tgt.exposure.agreement),
         months:this.zoneMonths(z),time:this.zonePrep(z),
         req:edu&&edu.typical_education?edu.typical_education:null,
-        license:edu&&edu.typical_education?edu.typical_education+' (BLS typical entry)':'Not tracked in this build — check your state’s requirements',
+        license:edu&&edu.typical_education?edu.typical_education+' (typical entry)':'Not tracked in this build — check your state’s requirements',
         floor:!!tgt.wage_is_floor,tech:tgt.tech||[],
         employment:tgt.employment||0,zone:z}; });
     const o={soc:b.origin.soc_code,title:ox.display_title,wage:ox.wage_median,floor:!!ox.wage_is_floor,zone:Math.round(ox.job_zone||0),
@@ -235,7 +235,7 @@ class Component extends DCLogic {
       const claudePrompt=`I'm exploring a career move with SkillBridge AI, which computes everything from real public data (O*NET, BLS OEWS, three AI-exposure indices). Reason only from these computed facts plus general career knowledge, and do not invent statistics:
 - Current job: ${o.title}, US median ${o.floor?'at least ':''}$${Math.round(o.wage).toLocaleString('en-US')}/yr, education zone ${o.zone} of 5.
 - Target: ${dm.title}, pay change ${this.fmtPay(dm)}/yr (national medians${dm.floor?'; the target median is top-coded, so this is a floor':''}), preparation ${dm.time}.
-- ${dm.req?'Typical entry education (BLS): '+dm.req+'. ':''}AI-exposure percentiles: me ${o.rng[0]}-${o.rng[1]}th today, target ${dm.rng[0]}-${dm.rng[1]}th (${dm.agree?'sources agree':'sources disagree'}).
+- ${dm.req?'Typical entry education: '+dm.req+'. ':''}AI-exposure percentiles: me ${o.rng[0]}-${o.rng[1]}th today, target ${dm.rng[0]}-${dm.rng[1]}th (${dm.agree?'sources agree':'sources disagree'}).
 - Skills to learn from scratch: ${dt.acquire.map(a=>a.skill).join(', ')||'none'}.
 - Skills to upgrade on the job: ${upgradeNames.join(', ')||'none'}.
 - Real tools/software O*NET lists for the target: ${(dm.tech||[]).slice(0,8).map(t=>t.name).join(', ')||'none listed'}.
