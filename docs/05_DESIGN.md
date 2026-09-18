@@ -199,8 +199,12 @@ same `/data/*.json` contract, new look:
   ranked table carry the same information with less clutter).
 
 - **Plan export (no accounts, by design):** step 4 offers "Download my plan
-  (PDF)" (a print-only document `#sb-print` — the browser's print-to-PDF is
-  the PDF engine, so it works on free static hosting) and "Download as CSV"
+  (PDF)" — a real PDF 1.4 file written byte-by-byte by a ~200-line in-app
+  writer (`makePlanPdf`): vector accent header band, stat row, gap bars,
+  checklist boxes, sources footer with page numbers; standard Helvetica
+  fonts, text wrapping measured via canvas, WinAnsi "»" for the
+  origin→target arrow. No library, no server; falls back to the print
+  stylesheet (`#sb-print`) if generation ever throws — and "Download as CSV"
   (built in the browser from the on-screen plan). Checklist state stays in
   the browser on that device; the copy says so and points to the PDF for
   keeping the plan anywhere. Generic office tools collapse into one quiet

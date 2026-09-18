@@ -55,6 +55,103 @@ class Component extends DCLogic {
     ];
     for(const [re,vendor,url] of CERTS){ if(re.test(n)) return {vendor,href:url||('https://learn.microsoft.com/en-us/credentials/browse/?terms='+encodeURIComponent(name))}; }
     return null; }
+
+  // ---- Built-in PDF writer (no libraries, no server) -------------------
+  // Writes a real PDF 1.4 file byte by byte: vector header band, stat row,
+  // gap bars, checklist boxes, per-page footer. Standard Helvetica fonts
+  // (no embedding); text widths measured via canvas for clean wrapping.
+  makePlanPdf(d){
+    const W=595.28,Hh=841.89,M=48,FOOT=44;
+    const ACC='0.925 0.188 0.075', INK='0.125 0.118 0.114', GRAY='0.42 0.40 0.39', LGRAY='0.88 0.87 0.86', WHITE='1 1 1';
+    let ctx=null; try{ ctx=document.createElement('canvas').getContext('2d'); }catch(e){}
+    const wOf=(t,size,bold)=>{ if(!ctx) return t.length*size*0.52;
+      ctx.font=(bold?'bold ':'')+size+'px Helvetica, Arial, sans-serif'; return ctx.measureText(t).width; };
+    const sane=t=>String(t==null?'':t).replace(/\u2265/g,'>= ').replace(/[\u2013\u2014\u2212]/g,'-').replace(/\u2192/g,'->')
+      .replace(/[\u00b7\u2022]/g,'-').replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"')
+      .replace(/\u2610/g,'[ ]').replace(/\u2611/g,'[x]').replace(/[^\x20-\x7e\u00bb]/g,'');
+    const esc=t=>sane(t).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').replace(/\u00bb/g,'\\273');
+    const N=v=>(Math.round(v*100)/100).toString();
+    const pages=[]; let ops=[]; let y=0;
+    const openPage=()=>{ ops=[]; pages.push(ops); y=M; };
+    const rect=(x,yy,w,h,c)=>ops.push(`${c} rg ${N(x)} ${N(Hh-yy-h)} ${N(w)} ${N(h)} re f`);
+    const box=(x,yy,sz,done)=>{ ops.push(`${GRAY} RG 0.9 w ${N(x)} ${N(Hh-yy-sz)} ${N(sz)} ${N(sz)} re S`);
+      if(done){ ops.push(`${ACC} RG 1.4 w ${N(x+1.6)} ${N(Hh-yy-sz+3)} m ${N(x+sz/2)} ${N(Hh-yy-sz+1.4)} l ${N(x+sz-1)} ${N(Hh-yy-1.4)} l S`); } };
+    const text=(t,x,yy,size,o2)=>{ const b=o2&&o2.bold, c=(o2&&o2.color)||INK;
+      ops.push(`BT /${b?'F2':'F1'} ${N(size)} Tf ${c} rg ${N(x)} ${N(Hh-yy)} Td (${esc(t)}) Tj ET`); };
+    const rtext=(t,xr,yy,size,o2)=>text(t,xr-wOf(sane(t),size,o2&&o2.bold),yy,size,o2);
+    const wrap=(t,size,bold,maxw)=>{ const words=sane(t).split(/\s+/).filter(Boolean); const out=[]; let cur='';
+      for(const w of words){ const cand=cur?cur+' '+w:w; if(wOf(cand,size,bold)<=maxw||!cur) cur=cand; else { out.push(cur); cur=w; } }
+      if(cur) out.push(cur); return out; };
+    const need=h=>{ if(y+h>Hh-M-FOOT) openPage(); };
+    const para=(t,x,size,o2,maxw,lh)=>{ const lines=wrap(t,size,o2&&o2.bold,maxw||W-M-x);
+      for(const ln of lines){ need(lh||size*1.45); y+=lh||size*1.45; text(ln,x,y,size,o2); } };
+    const section=t=>{ need(46); y+=34; text(t,M,y,12.5,{bold:true}); y+=7; rect(M,y,26,2.2,ACC); };
+
+    openPage();
+    // Header band
+    rect(0,0,W,112,ACC); y=0;
+    text('SKILLBRIDGE  -  MY CAREER PLAN',M,26,8.5,{bold:true,color:WHITE});
+    let ty=50; for(const ln of wrap(d.pair,19,true,W-2*M).slice(0,2)){ text(ln,M,ty,19,{bold:true,color:WHITE}); ty+=24; }
+    text('Generated '+d.printedOn+'  -  computed from US public data (O*NET, BLS OEWS)  -  not career advice',M,ty+2,8,{color:'1 0.85 0.81'});
+    y=112;
+    // Stat row
+    const cw=(W-2*M)/4; const stats=[['PAY CHANGE',d.pay+'/yr',true],['ESTIMATED TIME',d.time,false],['SKILLS TO CLOSE',d.skills,false],['TYPICAL ENTRY',d.license,false]];
+    y+=26; stats.forEach((st,i)=>{ const x=M+i*cw; text(st[0],x,y,7,{color:GRAY});
+      const vlines=wrap(st[1],st[2]?15:10.5,true,cw-14).slice(0,2);
+      vlines.forEach((vl,k)=>text(vl,x,y+16+k*12,st[2]?15:10.5,{bold:true,color:st[2]?ACC:INK})); });
+    y+=44; rect(M,y,W-2*M,1,LGRAY);
+    if(d.aiLine){ y+=16; text(d.aiLine,M,y,8.5,{color:GRAY}); }
+    if(d.floorNote){ y+=13; text(d.floorNote,M,y,8.5,{color:GRAY}); }
+    // 1 - learn from scratch
+    section('1  -  Skills to learn from scratch');
+    if(!d.acquire.length){ y+=20; text('Nothing to learn from scratch - every key skill is already in your profile at some level.',M,y,9.5,{color:GRAY}); }
+    for(const a of d.acquire){ need(40); y+=22; text(a.name,M,y,10,{bold:true});
+      text(a.lv+'  (O*NET 0-100 scale)',M+wOf(sane(a.name),10,true)+10,y,8.5,{color:GRAY});
+      y+=9; rect(M,y-5,170,4,LGRAY); rect(M,y-5,Math.max(6,170*a.pct),4,ACC);
+      text('course search: '+a.url,M+184,y-0.5,7.5,{color:GRAY}); }
+    // 2 - upgrade
+    section('2  -  Skills to upgrade on the job');
+    y+=8; para(d.upgrade.length?d.upgrade.join('  -  '):'Nothing to upgrade.',M,9.5,{color:INK},W-2*M,14);
+    // 3 - already have
+    section('3  -  Skills already at the required level ('+d.have.length+')');
+    y+=8; para(d.have.join(', ')+'.',M,8.5,{color:GRAY},W-2*M,12);
+    // 4 - tools
+    section('4  -  Tools & certifications employers expect');
+    if(!d.tech.length){ y+=20; text('No specific tools listed by O*NET for this occupation.',M,y,9.5,{color:GRAY}); }
+    for(const t2 of d.tech){ need(30); y+=19; text(t2.name,M,y,10,{bold:true});
+      y+=12; text(t2.label+':  '+t2.href,M+12,y,7.5,{color:GRAY}); }
+    if(d.techGeneric){ need(24); y+=16; para(d.techGeneric,M,8,{color:GRAY},W-2*M,11); }
+    // 5 - checklist
+    section('5  -  Checklist');
+    for(const ms of d.milestones){ need(26); y+=19; box(M,y-8,9,ms.done);
+      const lines=wrap(ms.title,9.5,false,W-2*M-140); text(lines[0],M+18,y,9.5,{color:ms.done?GRAY:INK});
+      rtext(ms.date,W-M,y,9.5,{bold:true}); let k=1; for(;k<lines.length;k++){ need(13); y+=13; text(lines[k],M+18,y,9.5,{color:ms.done?GRAY:INK}); } }
+    // Footers
+    pages.forEach((pops,i)=>{ const save=ops; ops=pops;
+      rect(M,Hh-M-FOOT+12,W-2*M,0.8,LGRAY);
+      text('Sources: O*NET (USDOL/ETA, CC BY 4.0) - BLS OEWS national medians - education from BLS EP or O*NET ETE - AIOE - OpenAI "GPTs are GPTs" - Microsoft "Working with AI".',M,Hh-M-FOOT+26,6.8,{color:GRAY});
+      text('Wages are national medians; ">=" marks a government floor. Profiles describe the typical job holder, not you. Analysis of public data - not career advice.',M,Hh-M-FOOT+36,6.8,{color:GRAY});
+      rtext('Page '+(i+1)+' of '+pages.length,W-M,Hh-M-FOOT+36,7.5,{color:GRAY});
+      ops=save; });
+    // Assemble the file
+    const objs=[]; const add=s2=>{ objs.push(s2); return objs.length; };
+    add('<< /Type /Catalog /Pages 2 0 R >>'); add('PAGES_PLACEHOLDER');
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const kids=[];
+    for(const pops of pages){ const cs=pops.join('\n');
+      const pid=add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${N(W)} ${N(Hh)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${objs.length+2} 0 R >>`);
+      add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`); kids.push(pid+' 0 R'); }
+    objs[1]=`<< /Type /Pages /Kids [ ${kids.join(' ')} ] /Count ${pages.length} >>`;
+    let out='%PDF-1.4\n'; const offs=[0];
+    objs.forEach((o3,i)=>{ offs.push(out.length); out+=(i+1)+' 0 obj\n'+o3+'\nendobj\n'; });
+    const xr=out.length; out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
+    for(let i=1;i<=objs.length;i++) out+=String(offs[i]).padStart(10,'0')+' 00000 n \n';
+    out+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+    const blob=new Blob([out],{type:'application/pdf'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=d.filename;
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); }
+
   srcPcts(exp){ const out=[]; if(exp){ if(exp.msft!=null)out.push(['Microsoft Research — observed Copilot use',exp.msft]);
       if(exp.aioe!=null)out.push(['AIOE — ability-based',exp.aioe]); if(exp.openai!=null)out.push(['OpenAI — task-based',exp.openai]); } return out; }
   rng(exp){ const v=this.srcPcts(exp).map(x=>Math.round(x[1]*100)); return v.length?[Math.min(...v),Math.max(...v)]:[0,0]; }
@@ -197,7 +294,16 @@ Explain in plain language whether this move makes sense for me, sketch a realist
         const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
         a.download='my-plan-'+dm.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.csv';
         document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); }catch(e){} };
-      const printPlan=()=>{ try{ window.print(); }catch(e){} };
+      const pdfDoc={pair:`${o.title} \u00bb ${dm.title}`,printedOn:new Date().toISOString().slice(0,10),
+        pay:this.fmtPay(dm),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${total}`,license:dm.license,
+        aiLine:`AI exposure: you ${o.rng[0]}-${o.rng[1]}th percentile today -> target ${dm.rng[0]}-${dm.rng[1]}th (${dm.agree?'sources agree':'sources disagree'}).`,
+        floorNote:(o.floor||dm.floor)?'A >= figure is a government floor: exact medians above $208,000 are not published.':'',
+        acquire:dt.acquire.map(a=>({name:a.skill,lv:'level '+a.o+' -> '+a.t,pct:Math.min(1,a.wg/wgMax),url:'classcentral.com/search?q='+encodeURIComponent(a.skill)})),
+        upgrade:upgradeNames,have:haveNames,
+        tech:techRows.map(t=>({name:t.name,label:t.linkLabel.replace(' \u2192','').replace(' ->',''),href:t.href})),
+        techGeneric:techGenericLine,milestones,
+        filename:'my-plan-'+dm.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.pdf'};
+      const printPlan=()=>{ try{ this.makePlanPdf(pdfDoc); }catch(e){ try{ window.print(); }catch(e2){} } };
       drawer={pair:`${o.title} → ${dm.title}`,pay:this.fmtPayRv(dm),time:dm.time,skills:`${dt.acquire.length+dt.upgrade.length} of ${total}`,license:dm.license,
         intro:`Here is what the O*NET skill profiles say separates your job from this one. Of ${total} skills that matter for ${dm.title}, you already hold ${dt.have.length} at the required level, ${dt.upgrade.length} need strengthening, and ${dt.acquire.length} must be learned from scratch.`,
         acquireIntro:dt.acquire.length?`Start here — these are the biggest gaps. The bar shows how much each one matters for the target job. Levels are O*NET's 0–100 scale: yours today → what the job needs.`:'Nothing to learn from scratch — every key skill is already in your profile at some level.',
